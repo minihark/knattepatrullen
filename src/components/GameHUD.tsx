@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { VehicleConfig, LevelConfig } from '../types';
+import { VehicleConfig, LevelConfig, CarUpgrades } from '../types';
 import { MenuModal } from './MenuModal';
-import { Menu, Compass } from 'lucide-react';
+import { Compass } from 'lucide-react';
 import { sounds } from '../audio/soundEngine';
 
 interface GameHUDProps {
@@ -9,6 +9,8 @@ interface GameHUDProps {
   currentLevel: LevelConfig;
   collectedCount: number;
   starsEarned: number;
+  upgrades: CarUpgrades;
+  onUpgrade: (category: 'engine' | 'suspension' | 'tires' | 'paint', val: any, cost: number) => void;
   onSelectVehicle: (v: VehicleConfig) => void;
   onSelectLevel: (lvl: LevelConfig) => void;
   onOpenDiploma: () => void;
@@ -23,6 +25,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   currentLevel,
   collectedCount,
   starsEarned,
+  upgrades,
+  onUpgrade,
   onSelectVehicle,
   onSelectLevel,
   onOpenDiploma,
@@ -116,6 +120,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         currentVehicle={currentVehicle}
         currentLevel={currentLevel}
         starsEarned={starsEarned}
+        upgrades={upgrades}
+        onUpgrade={onUpgrade}
         onSelectLevel={onSelectLevel}
         onSelectVehicle={onSelectVehicle}
         onOpenDiploma={onOpenDiploma}

@@ -1,5 +1,24 @@
 export type VehicleType = 'fire' | 'tractor' | 'rocket' | 'rescue';
 
+export interface VehicleTraits {
+  maxSpeed: number;
+  accel: number;
+  gravity: number;
+  jumpPower: number;
+  wheelScale: number;
+  special: 'water' | 'trailer' | 'hover' | 'nitro';
+  specialNameSv: string;
+  specialNameEn: string;
+  engineHumPitch: number;
+}
+
+export interface CarUpgrades {
+  engineLevel: number;      // 0, 1, 2, 3 (+speed, turbo flames)
+  suspensionLevel: number;  // 0, 1, 2, 3 (+jump, higher bounce)
+  tireLevel: number;        // 0, 1, 2, 3 (+grip, bigger wheels, chrome rims)
+  paintId: 'default' | 'gold' | 'neon' | 'fire';
+}
+
 export interface VehicleConfig {
   id: VehicleType;
   nameSv: string;
@@ -11,6 +30,7 @@ export interface VehicleConfig {
   honkSound: 'horn' | 'quack' | 'siren' | 'boing';
   hornEmoji: string;
   descriptionSv: string;
+  traits: VehicleTraits;
 }
 
 export type LevelId = 'apples' | 'shapes' | 'letters' | 'math' | 'colors' | 'beach';
@@ -70,7 +90,7 @@ export interface Particle {
   alpha: number;
   life: number;
   maxLife: number;
-  shape?: 'circle' | 'star' | 'heart' | 'note' | 'bubble';
+  shape?: 'circle' | 'star' | 'heart' | 'note' | 'bubble' | 'water' | 'flame' | 'smoke';
 }
 
 export interface BridgePuzzleState {

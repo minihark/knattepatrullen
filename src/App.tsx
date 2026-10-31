@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { VehicleConfig, LevelConfig, VehicleType } from './types';
+import { VehicleConfig, LevelConfig, VehicleType, CarUpgrades } from './types';
 import { VEHICLES, LEVELS } from './data/gameData';
 import { GameCanvas } from './components/GameCanvas';
 import { TouchControls } from './components/TouchControls';
@@ -25,6 +25,47 @@ export const App: React.FC = () => {
       return 0;
     }
   });
+
+  // Car Upgrades State (saved in localStorage)
+  const [upgrades, setUpgrades] = useState<CarUpgrades>(() => {
+    try {
+      const saved = localStorage.getItem('knatte_car_upgrades');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      engineLevel: 1,
+      suspensionLevel: 1,
+      tireLevel: 1,
+      paintId: 'default',
+    };
+  });
+
+  const handleUpgrade = (
+    category: 'engine' | 'suspension' | 'tires' | 'paint',
+    val: any,
+    cost: number
+  ) => {
+    if (starsEarned < cost) return;
+    setStarsEarned((prev) => {
+      const next = prev - cost;
+      try {
+        localStorage.setItem('knatte_stars', String(next));
+      } catch {}
+      return next;
+    });
+
+    setUpgrades((prev) => {
+      const next = { ...prev };
+      if (category === 'engine') next.engineLevel = val;
+      if (category === 'suspension') next.suspensionLevel = val;
+      if (category === 'tires') next.tireLevel = val;
+      if (category === 'paint') next.paintId = val;
+      try {
+        localStorage.setItem('knatte_car_upgrades', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // Driving Controls State
   const [drivingForward, setDrivingForward] = useState<boolean>(false);
@@ -161,6 +202,8 @@ export const App: React.FC = () => {
         currentLevel={currentLevel}
         collectedCount={collectedCount}
         starsEarned={starsEarned}
+        upgrades={upgrades}
+        onUpgrade={handleUpgrade}
         onSelectVehicle={(v) => setCurrentVehicle(v)}
         onSelectLevel={handleSelectLevel}
         onOpenDiploma={() => setDiplomaModalOpen(true)}
@@ -178,6 +221,7 @@ export const App: React.FC = () => {
       <GameCanvas
         currentVehicle={currentVehicle.id}
         currentLevel={currentLevel}
+        upgrades={upgrades}
         onItemCollected={handleItemCollected}
         onGoalReached={handleGoalReached}
         onRequestShapePuzzle={(shape) => {
