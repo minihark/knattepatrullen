@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { VehicleConfig, LevelConfig } from '../types';
-import { VEHICLES, LEVELS } from '../data/gameData';
+import { MenuModal } from './MenuModal';
+import { Menu, Compass } from 'lucide-react';
 import { sounds } from '../audio/soundEngine';
-import { Volume2, VolumeX, Award, Sparkles } from 'lucide-react';
 
 interface GameHUDProps {
   currentVehicle: VehicleConfig;
@@ -31,110 +31,100 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   isMuted,
   onToggleMute,
 }) => {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [initialMenuTab, setInitialMenuTab] = useState<'levels' | 'garage' | 'settings'>('levels');
+
+  const openMenuWithTab = (tab: 'levels' | 'garage' | 'settings') => {
+    sounds.init();
+    setInitialMenuTab(tab);
+    setMenuOpen(true);
+  };
+
   return (
-    <header className="absolute top-0 inset-x-0 p-3 sm:p-5 flex flex-col gap-2 z-30 pointer-events-none">
-      {/* Top Bar */}
-      <div className="flex items-center justify-between gap-2">
-        {/* Left: Level Title & Mission Goal Counter */}
-        <div className="pointer-events-auto flex items-center gap-2 sm:gap-3 bg-white/90 backdrop-blur-md px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl border-2 border-slate-200/80 shadow-md">
-          <span className="text-2xl sm:text-3xl">{currentLevel.emoji}</span>
-          <div>
-            <h1 className="text-sm sm:text-base font-extrabold text-slate-800 leading-tight font-display">
+    <>
+      {/* Sleek, Low-Profile Floating Top Bar */}
+      <header className="absolute top-0 inset-x-0 pt-[env(safe-area-inset-top,10px)] p-2.5 sm:p-4 flex items-center justify-between z-20 pointer-events-none select-none">
+        {/* Left: Ultra-Compact Mission Pill */}
+        <button
+          type="button"
+          onClick={() => {
+            sounds.init();
+            const introSpeech =
+              lang === 'sv'
+                ? `${currentLevel.titleSv}! Mål: samla ${currentLevel.goalCount} stycken!`
+                : `${currentLevel.titleEn}! Goal: collect ${currentLevel.goalCount}!`;
+            sounds.speak(introSpeech, lang);
+          }}
+          className="pointer-events-auto flex items-center gap-2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-2xl border-2 border-slate-200/90 shadow-md active:scale-95 transition-all"
+        >
+          <span className="text-xl sm:text-2xl leading-none">{currentLevel.emoji}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs sm:text-sm font-extrabold text-slate-800 font-display hidden xs:inline">
               {lang === 'sv' ? currentLevel.titleSv : currentLevel.titleEn}
-            </h1>
-            <p className="text-[11px] sm:text-xs font-bold text-amber-600 flex items-center gap-1">
-              <span>{lang === 'sv' ? 'Mål:' : 'Goal:'}</span>
-              <span className="text-slate-900 bg-amber-100 px-1.5 py-0.5 rounded-md">
-                {collectedCount} / {currentLevel.goalCount}
-              </span>
-            </p>
+            </span>
+            <span className="text-xs sm:text-sm font-black text-amber-700 bg-amber-100/90 px-2 py-0.5 rounded-lg">
+              {collectedCount} / {currentLevel.goalCount}
+            </span>
           </div>
-        </div>
+        </button>
 
-        {/* Center: Vehicle Quick Switcher */}
-        <div className="pointer-events-auto flex items-center gap-1 sm:gap-1.5 bg-white/90 backdrop-blur-md p-1.5 rounded-2xl border-2 border-slate-200/80 shadow-md">
-          {VEHICLES.map((v) => {
-            const isSelected = v.id === currentVehicle.id;
-            return (
-              <button
-                key={v.id}
-                type="button"
-                onClick={() => {
-                  sounds.init();
-                  sounds.playHorn(v.honkSound);
-                  onSelectVehicle(v);
-                }}
-                title={lang === 'sv' ? v.nameSv : v.nameEn}
-                className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-xl sm:text-2xl transition-all active:scale-95 ${
-                  isSelected
-                    ? 'bg-amber-400 ring-2 ring-amber-500 scale-105 shadow-sm'
-                    : 'hover:bg-slate-100 text-slate-600'
-                }`}
-              >
-                {v.emoji}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Right: Stars, Diploma & Audio Controls */}
+        {/* Right: Garage, Stars & Menu Buttons */}
         <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2">
-          {/* Diploma / Stars Badge */}
+          {/* Quick Vehicle / Garage Button */}
           <button
             type="button"
-            onClick={onOpenDiploma}
-            className="flex items-center gap-1.5 bg-amber-400 hover:bg-amber-500 active:scale-95 text-amber-950 font-extrabold px-3 py-2 rounded-2xl shadow-md border-2 border-amber-300 transition-all text-xs sm:text-sm"
+            onClick={() => openMenuWithTab('garage')}
+            aria-label={lang === 'sv' ? 'Byt bil i garaget' : 'Switch car in garage'}
+            className="flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl border-2 border-slate-200/90 shadow-md hover:bg-white active:scale-95 transition-all text-xs sm:text-sm font-extrabold text-slate-800"
           >
-            <Award className="w-4 h-4 text-amber-900" />
-            <span>⭐ {starsEarned}</span>
+            <span className="text-xl leading-none">{currentVehicle.emoji}</span>
+            <span className="hidden sm:inline font-display">{currentVehicle.nameSv.split(' ')[0]}</span>
+            <span className="text-slate-400 text-[10px]">▼</span>
           </button>
 
-          {/* Language Toggle */}
+          {/* Stars / Diploma Badge */}
           <button
             type="button"
-            onClick={onToggleLang}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-white/90 hover:bg-white text-xs font-bold text-slate-700 border-2 border-slate-200/80 shadow-md flex items-center justify-center transition-all"
+            onClick={() => {
+              sounds.init();
+              onOpenDiploma();
+            }}
+            aria-label={lang === 'sv' ? 'Se guldstjärnor och körkort' : 'View license and stars'}
+            className="flex items-center gap-1 bg-amber-400 hover:bg-amber-500 active:scale-95 text-amber-950 font-black px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-2xl shadow-md border-2 border-amber-300 transition-all text-xs sm:text-sm"
           >
-            {lang === 'sv' ? '🇸🇪' : '🇬🇧'}
+            <span>⭐</span>
+            <span>{starsEarned}</span>
           </button>
 
-          {/* Sound Mute Toggle */}
+          {/* Main Menu Button (Banor & Inställningar) */}
           <button
             type="button"
-            onClick={onToggleMute}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-white/90 hover:bg-white text-slate-700 border-2 border-slate-200/80 shadow-md flex items-center justify-center transition-all"
+            onClick={() => openMenuWithTab('levels')}
+            aria-label={lang === 'sv' ? 'Öppna äventyrsmenyn' : 'Open adventure menu'}
+            className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-extrabold px-3 py-1.5 sm:px-4 sm:py-2 rounded-2xl shadow-md border-2 border-slate-700 transition-all text-xs sm:text-sm"
           >
-            {isMuted ? <VolumeX className="w-5 h-5 text-red-500" /> : <Volume2 className="w-5 h-5" />}
+            <Compass className="w-4 h-4 text-amber-400 stroke-[2.5]" />
+            <span className="font-display">{lang === 'sv' ? 'Banor' : 'Tracks'}</span>
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* Level Selector Pills */}
-      <div className="pointer-events-auto flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none self-start">
-        {LEVELS.map((lvl, idx) => {
-          const isSelected = lvl.id === currentLevel.id;
-          return (
-            <button
-              key={lvl.id}
-              type="button"
-              onClick={() => {
-                sounds.init();
-                onSelectLevel(lvl);
-              }}
-              className={`px-3 py-1 rounded-xl text-xs sm:text-sm font-extrabold transition-all flex items-center gap-1.5 shadow-sm active:scale-95 whitespace-nowrap ${
-                isSelected
-                  ? 'bg-slate-900 text-white ring-2 ring-slate-700'
-                  : 'bg-white/90 hover:bg-white text-slate-700 border border-slate-200'
-              }`}
-            >
-              <span>{lvl.emoji}</span>
-              <span>
-                {lang === 'sv' ? `Bana ${idx + 1}` : `Level ${idx + 1}`}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </header>
+      {/* Clean Popup Menu Modal */}
+      <MenuModal
+        isOpen={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        currentVehicle={currentVehicle}
+        currentLevel={currentLevel}
+        starsEarned={starsEarned}
+        onSelectLevel={onSelectLevel}
+        onSelectVehicle={onSelectVehicle}
+        onOpenDiploma={onOpenDiploma}
+        lang={lang}
+        onToggleLang={onToggleLang}
+        isMuted={isMuted}
+        onToggleMute={onToggleMute}
+        initialTab={initialMenuTab}
+      />
+    </>
   );
 };
