@@ -46,7 +46,7 @@ export const ShapePuzzleModal: React.FC<ShapePuzzleModalProps> = ({
         lang === 'sv'
           ? `Jippi! ${targetShapeObj.nameSv} passar perfekt i hålet! Bron är lagad!`
           : `Yay! ${targetShapeObj.nameEn} fits perfectly! Bridge repaired!`;
-      sounds.speak(praise, lang);
+      sounds.playVoiceClip('jippi', praise, lang);
 
       setTimeout(() => {
         onSolve();
@@ -58,7 +58,7 @@ export const ShapePuzzleModal: React.FC<ShapePuzzleModalProps> = ({
         lang === 'sv'
           ? `Kolla noga! Vi letar efter en ${targetShapeObj.nameSv}!`
           : `Look closely! We need a ${targetShapeObj.nameEn}!`;
-      sounds.speak(hint, lang);
+      sounds.playVoiceClip('hint_shape', hint, lang);
       setTimeout(() => setIsError(false), 800);
     }
   };

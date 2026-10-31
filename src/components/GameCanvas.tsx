@@ -43,6 +43,17 @@ interface AnimalProp {
   jumpVy: number;
 }
 
+interface FloatingText {
+  id: number;
+  text: string;
+  x: number;
+  y: number;
+  vy: number;
+  alpha: number;
+  color: string;
+  size: number;
+}
+
 export const GameCanvas: React.FC<GameCanvasProps> = ({
   currentVehicle,
   currentLevel,
@@ -122,6 +133,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     ] as AnimalProp[],
 
     windmillAngle: 0,
+
+    // Floating text juice
+    floatingTexts: [] as FloatingText[],
+    nextTextId: 1,
+
+    // Speed boost pads
+    boostPads: [2400, 5200],
+    boostCooldown: 0,
 
     // Controls state ref
     drivingForward: false,
@@ -285,6 +304,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     state.hasReachedGoal = false;
     state.hasPromptedCheckpoint = false;
     state.particles = [];
+    state.floatingTexts = [];
+    state.boostCooldown = 0;
 
     state.goalX = 6600;
 
@@ -328,13 +349,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       collected: false,
     }));
 
-    // Speak introductory mission greeting
+    // Speak introductory mission greeting with human voice clip
     const introSpeech =
       lang === 'sv'
         ? `${currentLevel.titleSv}! ${currentLevel.missionDescriptionSv}`
         : `${currentLevel.titleEn}! ${currentLevel.missionDescriptionEn}`;
     setTimeout(() => {
-      sounds.speak(introSpeech, lang);
+      sounds.playVoiceClip(`level_${currentLevel.id}`, introSpeech, lang);
     }, 400);
 
     return () => {
@@ -534,6 +555,40 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         state.trailerAngle = state.angle * 0.85;
       }
 
+      // Check Speed Boost Pads
+      if (state.boostCooldown > 0) state.boostCooldown -= dt;
+      state.boostPads.forEach((bx) => {
+        if (Math.abs(state.carX - bx) < 48 && state.isGrounded && state.boostCooldown <= 0) {
+          state.vx = Math.min(state.vx + 6.2, 14.5);
+          state.boostCooldown = 0.8;
+          sounds.playTurbo();
+          state.floatingTexts.push({
+            id: state.nextTextId++,
+            text: 'TURBO! ⚡',
+            x: bx,
+            y: getGroundY(bx, viewH) - 45,
+            vy: -2.8,
+            alpha: 1,
+            color: '#FBBF24',
+            size: 26,
+          });
+          for (let p = 0; p < 14; p++) {
+            state.particles.push({
+              x: bx + (Math.random() - 0.5) * 30,
+              y: getGroundY(bx, viewH) - 10,
+              vx: -7 - Math.random() * 6,
+              vy: (Math.random() - 0.5) * 3,
+              size: 8 + Math.random() * 6,
+              color: ['#F59E0B', '#EF4444', '#38BDF8', '#FDE047'][p % 4],
+              alpha: 1,
+              life: 0,
+              maxLife: 24,
+              shape: 'flame',
+            });
+          }
+        }
+      });
+
       // Check Extinguishing Campfires with Fire Truck
       state.campfires.forEach((fire) => {
         if (!fire.extinguished) {
@@ -546,6 +601,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           if (dist < 80 && (hasWaterStream || (vehicleConfig.id === 'fire' && state.drivingForward))) {
             fire.extinguished = true;
             sounds.playSnap();
+            state.floatingTexts.push({
+              id: state.nextTextId++,
+              text: 'SLÄCKT! 💦',
+              x: fire.x,
+              y: getGroundY(fire.x, viewH) - 40,
+              vy: -2.4,
+              alpha: 1,
+              color: '#38BDF8',
+              size: 24,
+            });
 
             // Steam cloud puff
             for (let s = 0; s < 12; s++) {
@@ -574,6 +639,19 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           state.vy = -17.5 * (1 + (upgrades.suspensionLevel - 1) * 0.15);
           state.isGrounded = false;
           sounds.playJump(1.4);
+          state.floatingTexts.push({
+            id: state.nextTextId++,
+            text: 'SUPER-HOPP! 🦘',
+            x: m.x,
+            y: groundY - 50,
+            vy: -2.8,
+            alpha: 1,
+            color: '#38BDF8',
+            size: 24,
+          });
+          if (Math.random() < 0.6) {
+            sounds.playVoiceClip('superhopp', 'Super-hopp!', lang);
+          }
 
           for (let p = 0; p < 10; p++) {
             state.particles.push({
@@ -635,8 +713,31 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 ? countSwedish[totalCollected - 1] || `${totalCollected}!`
                 : countEnglish[totalCollected - 1] || `${totalCollected}!`;
 
-            sounds.speak(countWord, lang);
+            sounds.playVoiceClip(`count_${totalCollected}`, countWord, lang);
             onItemCollected(totalCollected, currentLevel.itemType);
+
+            const itemEmoji =
+              item.type === 'apple'
+                ? '🍎'
+                : item.type === 'letter'
+                ? '🔤'
+                : item.type === 'number'
+                ? '🔢'
+                : item.type === 'shapeKey'
+                ? '🔺'
+                : item.type === 'colorOrb'
+                ? '🎨'
+                : '⭐';
+            state.floatingTexts.push({
+              id: state.nextTextId++,
+              text: `+1 ${itemEmoji}`,
+              x: item.x,
+              y: item.y - 25,
+              vy: -2.6,
+              alpha: 1,
+              color: '#10B981',
+              size: 26,
+            });
 
             for (let p = 0; p < 14; p++) {
               state.particles.push({
@@ -693,8 +794,29 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           lang === 'sv'
             ? 'Hurra! Du klarade banan! Bra kört!'
             : 'Hooray! You did it! Great driving!';
-        sounds.speak(cheers, lang);
+        sounds.playVoiceClip('cheer', cheers, lang);
+        state.floatingTexts.push({
+          id: state.nextTextId++,
+          text: 'HURRA! 🏆',
+          x: state.goalX,
+          y: getGroundY(state.goalX, viewH) - 80,
+          vy: -2.8,
+          alpha: 1,
+          color: '#F59E0B',
+          size: 32,
+        });
         onGoalReached();
+      }
+
+      // Update Floating Texts Physics
+      for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
+        const ft = state.floatingTexts[i];
+        ft.y += ft.vy;
+        ft.vy *= 0.95;
+        ft.alpha -= dt * 0.85;
+        if (ft.alpha <= 0) {
+          state.floatingTexts.splice(i, 1);
+        }
       }
 
       // Smooth Camera tracking
@@ -759,14 +881,141 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
       });
 
-      // Distant Hills (Mid-ground parallax)
+      // 1. Distant Snow-Capped Mountain Range (Slow Parallax: 0.07x)
       ctx.save();
-      ctx.translate(-state.camX * 0.35, -state.camY * 0.2);
-      ctx.fillStyle = '#BBF7D0';
+      ctx.translate(-state.camX * 0.07, -state.camY * 0.05);
+      const mtnBaseY = viewH * 0.65;
+      const peaks = [
+        { x: -100, w: 320, h: 140 },
+        { x: 200, w: 420, h: 180 },
+        { x: 580, w: 360, h: 150 },
+        { x: 900, w: 480, h: 200 },
+        { x: 1350, w: 380, h: 160 },
+        { x: 1700, w: 440, h: 190 },
+        { x: 2100, w: 360, h: 155 },
+        { x: 2420, w: 460, h: 205 },
+        { x: 2850, w: 400, h: 170 },
+        { x: 3220, w: 480, h: 210 },
+        { x: 3680, w: 390, h: 165 },
+        { x: 4050, w: 460, h: 195 },
+        { x: 4480, w: 420, h: 175 },
+        { x: 4880, w: 490, h: 215 },
+        { x: 5350, w: 410, h: 170 },
+        { x: 5720, w: 470, h: 200 },
+        { x: 6150, w: 430, h: 180 },
+        { x: 6550, w: 480, h: 210 },
+      ];
+      peaks.forEach((p) => {
+        const peakX = p.x + p.w / 2;
+        const peakY = mtnBaseY - p.h;
+        // Mountain base
+        ctx.fillStyle = '#94A3B8';
+        ctx.beginPath();
+        ctx.moveTo(p.x, mtnBaseY);
+        ctx.lineTo(peakX, peakY);
+        ctx.lineTo(p.x + p.w, mtnBaseY);
+        ctx.closePath();
+        ctx.fill();
+
+        // Snow Cap
+        const snowH = p.h * 0.32;
+        ctx.fillStyle = '#F8FAFC';
+        ctx.beginPath();
+        ctx.moveTo(peakX, peakY);
+        ctx.lineTo(peakX + p.w * 0.16, peakY + snowH);
+        ctx.lineTo(peakX + p.w * 0.05, peakY + snowH * 0.85);
+        ctx.lineTo(peakX - p.w * 0.04, peakY + snowH * 1.1);
+        ctx.lineTo(peakX - p.w * 0.16, peakY + snowH);
+        ctx.closePath();
+        ctx.fill();
+      });
+      ctx.restore();
+
+      // 2. Midground Rolling Pine Forest & Swedish Red Cottages (0.22x Parallax)
+      ctx.save();
+      ctx.translate(-state.camX * 0.22, -state.camY * 0.12);
+      ctx.fillStyle = '#86EFAC';
       ctx.beginPath();
       ctx.moveTo(-200, viewH + 200);
-      for (let x = -200; x < 7500; x += 80) {
-        const y = viewH * 0.55 + Math.sin(x * 0.0018) * 45 + Math.cos(x * 0.004) * 25;
+      for (let x = -200; x < 7500; x += 60) {
+        const y = viewH * 0.58 + Math.sin(x * 0.002) * 35 + Math.cos(x * 0.005) * 18;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(7500, viewH + 200);
+      ctx.fill();
+
+      // Swedish Red Cottages (Falu rödfärg stugor)
+      const cottages = [350, 1250, 2150, 3050, 3950, 4850, 5750, 6550];
+      cottages.forEach((cx) => {
+        const cy = viewH * 0.58 + Math.sin(cx * 0.002) * 35 + Math.cos(cx * 0.005) * 18;
+        // Red wooden cottage body
+        ctx.fillStyle = '#B91C1C';
+        ctx.fillRect(cx - 18, cy - 24, 36, 24);
+
+        // White corner trims
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(cx - 18, cy - 24, 3, 24);
+        ctx.fillRect(cx + 15, cy - 24, 3, 24);
+
+        // Window with 4 panes
+        ctx.fillStyle = '#FEF08A';
+        ctx.fillRect(cx - 6, cy - 16, 12, 10);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(cx - 1, cy - 16, 2, 10);
+        ctx.fillRect(cx - 6, cy - 12, 12, 2);
+
+        // Chimney & gentle smoke puff
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(cx + 6, cy - 36, 5, 12);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.beginPath();
+        ctx.arc(cx + 8, cy - 40, 4, 0, Math.PI * 2);
+        ctx.arc(cx + 12, cy - 46, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Dark slate pitched roof
+        ctx.fillStyle = '#1E293B';
+        ctx.beginPath();
+        ctx.moveTo(cx - 22, cy - 24);
+        ctx.lineTo(cx, cy - 38);
+        ctx.lineTo(cx + 22, cy - 24);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Stylized Nordic Pine Trees around the cottage
+        [-30, 30].forEach((txOffset) => {
+          const tx = cx + txOffset;
+          const ty = cy;
+          // Pine trunk
+          ctx.fillStyle = '#78350F';
+          ctx.fillRect(tx - 2, ty - 10, 4, 10);
+          // 3 triangular pine needle tiers
+          ctx.fillStyle = '#15803D';
+          for (let tier = 0; tier < 3; tier++) {
+            ctx.beginPath();
+            const tierY = ty - 10 - tier * 8;
+            const tierW = 13 - tier * 3;
+            ctx.moveTo(tx - tierW, tierY);
+            ctx.lineTo(tx, tierY - 12);
+            ctx.lineTo(tx + tierW, tierY);
+            ctx.closePath();
+            ctx.fill();
+          }
+        });
+      });
+      ctx.restore();
+
+      // 3. Near Rolling Hills (0.4x Parallax)
+      ctx.save();
+      ctx.translate(-state.camX * 0.4, -state.camY * 0.2);
+      ctx.fillStyle = '#4ADE80';
+      ctx.beginPath();
+      ctx.moveTo(-200, viewH + 200);
+      for (let x = -200; x < 7500; x += 70) {
+        const y = viewH * 0.63 + Math.sin(x * 0.0035) * 28 + Math.cos(x * 0.002) * 16;
         ctx.lineTo(x, y);
       }
       ctx.lineTo(7500, viewH + 200);
@@ -795,6 +1044,28 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.fillStyle = currentLevel.theme.grassFill;
       ctx.fill();
 
+      // Subsurface earthy strata band
+      ctx.save();
+      ctx.fillStyle = currentLevel.theme.groundFill || '#78350F';
+      ctx.beginPath();
+      ctx.moveTo(startX, deepBottom);
+      for (let x = startX; x <= endX; x += 15) {
+        ctx.lineTo(x, getGroundY(x, viewH) + 38);
+      }
+      ctx.lineTo(endX, deepBottom);
+      ctx.closePath();
+      ctx.fill();
+
+      // Embedded subsurface pebbles
+      ctx.fillStyle = '#94A3B8';
+      for (let px = startX + 50; px < endX; px += 160) {
+        const py = getGroundY(px, viewH) + 22;
+        ctx.beginPath();
+        ctx.ellipse(px, py, 6, 3.5, 0.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+
       // Grass Rim Outline with Tactile Blades
       ctx.beginPath();
       for (let x = startX; x <= endX; x += 15) {
@@ -809,6 +1080,28 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.stroke();
+
+      // Speed Boost Pads on Slopes
+      state.boostPads.forEach((bx) => {
+        const by = getGroundY(bx, viewH);
+        ctx.save();
+        ctx.translate(bx, by);
+        // Yellow chevron speed strip
+        ctx.fillStyle = '#F59E0B';
+        ctx.beginPath();
+        ctx.roundRect(-36, -6, 72, 8, 4);
+        ctx.fill();
+        ctx.strokeStyle = '#FEF08A';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 16px Fredoka, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('⚡ ❯❯❯ ⚡', 0, -2);
+        ctx.restore();
+      });
 
       // Wooden Fence at start
       for (let fx = 120; fx < 360; fx += 40) {
@@ -1318,7 +1611,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.strokeRect(-42, -10, 8, 8);
       }
 
-      // Headlight
+      // Headlight & Dynamic Lighting Beam
       ctx.fillStyle = '#FDE047';
       ctx.beginPath();
       ctx.arc(38, -10, 6, 0, Math.PI * 2);
@@ -1326,6 +1619,22 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.strokeStyle = '#0F172A';
       ctx.lineWidth = 2;
       ctx.stroke();
+
+      // Dynamic Headlight Glow Beam shining forward onto track
+      ctx.save();
+      const beamGrad = ctx.createRadialGradient(38, -10, 6, 180, 10, 160);
+      beamGrad.addColorStop(0, 'rgba(254, 240, 138, 0.42)');
+      beamGrad.addColorStop(0.4, 'rgba(254, 240, 138, 0.14)');
+      beamGrad.addColorStop(1, 'rgba(254, 240, 138, 0)');
+      ctx.fillStyle = beamGrad;
+      ctx.beginPath();
+      ctx.moveTo(38, -12);
+      ctx.lineTo(210, -32);
+      ctx.lineTo(230, 48);
+      ctx.lineTo(38, -4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
 
       // Suspension Springs Upgrade (suspensionLevel >= 2)
       if (upgrades.suspensionLevel >= 2) {
@@ -1434,6 +1743,23 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
         ctx.restore();
       }
+
+      // ----------------------------------------------------
+      // FLOATING JUICE TEXTS (+1 🍎, SUPER-HOPP!, TURBO!, SLÄCKT!)
+      // ----------------------------------------------------
+      state.floatingTexts.forEach((ft) => {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, ft.alpha);
+        ctx.font = `900 ${ft.size}px Fredoka, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.strokeStyle = '#0F172A';
+        ctx.lineWidth = 4;
+        ctx.strokeText(ft.text, ft.x, ft.y);
+        ctx.fillStyle = ft.color;
+        ctx.fillText(ft.text, ft.x, ft.y);
+        ctx.restore();
+      });
 
       ctx.restore();
 

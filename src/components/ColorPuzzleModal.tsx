@@ -46,7 +46,7 @@ export const ColorPuzzleModal: React.FC<ColorPuzzleModalProps> = ({
         lang === 'sv'
           ? `Hurra! ${targetColorObj.nameSv} färg målade bron! Nu kör vi vidare!`
           : `Hooray! ${targetColorObj.nameEn} painted the bridge! Let's go!`;
-      sounds.speak(praise, lang);
+      sounds.playVoiceClip('jippi', praise, lang);
 
       setTimeout(() => {
         onSolve();
@@ -58,7 +58,7 @@ export const ColorPuzzleModal: React.FC<ColorPuzzleModalProps> = ({
         lang === 'sv'
           ? `Vi behöver ${targetColorObj.nameSv} färg! Prova igen!`
           : `We need ${targetColorObj.nameEn}! Try again!`;
-      sounds.speak(hint, lang);
+      sounds.playVoiceClip('hint_color', hint, lang);
       setTimeout(() => setIsError(false), 800);
     }
   };

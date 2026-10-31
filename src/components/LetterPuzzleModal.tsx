@@ -78,7 +78,8 @@ export const LetterPuzzleModal: React.FC<LetterPuzzleModalProps> = ({
         lang === 'sv'
           ? `Jippi! ${currentQ.letter}! ${currentQ.letter} som i ${targetWord}! Helt rätt!`
           : `Hooray! ${currentQ.letter}! ${currentQ.letter} is for ${targetWord}!`;
-      sounds.speak(praise, lang);
+
+      sounds.playVoiceClip(`letter_${currentQ.letter}`, praise, lang);
 
       setTimeout(() => {
         onSolve();
@@ -88,9 +89,9 @@ export const LetterPuzzleModal: React.FC<LetterPuzzleModalProps> = ({
       setIsError(true);
       const hint =
         lang === 'sv'
-          ? `Lyssna noga: ${targetWord}! Vi letar efter bokstaven ${currentQ.letter}!`
-          : `Listen closely: ${targetWord}! We need letter ${currentQ.letter}!`;
-      sounds.speak(hint, lang);
+          ? `Kolla noga och prova igen!`
+          : `Look closely and try again!`;
+      sounds.playVoiceClip('hint_tryagain', hint, lang);
       setTimeout(() => setIsError(false), 800);
     }
   };

@@ -26,6 +26,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       sounds.playVictory();
+      sounds.playVoiceClip('bra_jobbat', 'Bra jobbat!', lang);
       confetti({
         particleCount: 80,
         spread: 90,

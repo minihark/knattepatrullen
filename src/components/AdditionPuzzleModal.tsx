@@ -75,7 +75,8 @@ export const AdditionPuzzleModal: React.FC<AdditionPuzzleModalProps> = ({
         lang === 'sv'
           ? `Strålande! ${currentQ.num1} plus ${currentQ.num2} är lika med ${currentQ.sum}! Bra räknat!`
           : `Brilliant! ${currentQ.num1} plus ${currentQ.num2} equals ${currentQ.sum}! Great math!`;
-      sounds.speak(praise, lang);
+
+      sounds.playVoiceClip(`math_${currentQ.num1}_${currentQ.num2}`, praise, lang);
 
       setTimeout(() => {
         onSolve();
@@ -85,9 +86,9 @@ export const AdditionPuzzleModal: React.FC<AdditionPuzzleModalProps> = ({
       setIsError(true);
       const hint =
         lang === 'sv'
-          ? `Räkna alla figurerna en och en! Prova igen!`
-          : `Count all the shapes one by one! Try again!`;
-      sounds.speak(hint, lang);
+          ? `Kolla noga och prova igen!`
+          : `Look closely and try again!`;
+      sounds.playVoiceClip('hint_tryagain', hint, lang);
       setTimeout(() => setIsError(false), 800);
     }
   };

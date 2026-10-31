@@ -11,6 +11,7 @@ class SoundEngine {
   private engineFilter: BiquadFilterNode | null = null;
   private currentVehicleType: string = 'fire';
   private cachedVoices: SpeechSynthesisVoice[] = [];
+  private audioBuffers: Map<string, AudioBuffer> = new Map();
 
   constructor() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -485,7 +486,46 @@ class SoundEngine {
   }
 
   // ------------------------------------------------------------------
-  // 3. EXPRESSIVE & REALISTIC VOICE FOR 5-YEAR-OLDS
+  // 3. STUDIO HUMAN VOICE CLIPS (NATURAL SWEDISH PRONUNCIATION)
+  // ------------------------------------------------------------------
+  public async playVoiceClip(clipId: string, fallbackText?: string, lang: 'sv' | 'en' = 'sv') {
+    if (this.isMuted) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+    this.init();
+
+    const prefix = lang === 'sv' ? 'sv_' : 'en_';
+    const fullKey = clipId.startsWith('sv_') || clipId.startsWith('en_') ? clipId : `${prefix}${clipId}`;
+    const url = `/audio/voices/${fullKey}.mp3`;
+
+    try {
+      let buffer = this.audioBuffers.get(fullKey);
+      if (!buffer) {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Clip ${fullKey} not found`);
+        const arrayBuf = await res.arrayBuffer();
+        buffer = await ctx.decodeAudioData(arrayBuf);
+        this.audioBuffers.set(fullKey, buffer);
+      }
+
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.95, ctx.currentTime);
+      source.connect(gain);
+      gain.connect(ctx.destination);
+      source.start();
+      return;
+    } catch {
+      // Fallback gracefully to Web Speech API
+      if (fallbackText) {
+        this.speak(fallbackText, lang);
+      }
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // 4. EXPRESSIVE FALLBACK SYNTHESIS
   // ------------------------------------------------------------------
   public speak(text: string, lang: 'sv' | 'en' = 'sv') {
     if (this.isMuted) return;
