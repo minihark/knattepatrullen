@@ -140,7 +140,7 @@ export const App: React.FC = () => {
   }, [triggerHonk]);
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-slate-900 select-none">
+    <div className="fixed inset-0 w-full h-[100dvh] overflow-hidden bg-slate-900 select-none">
       {/* Top HUD (Header, Mission Counter, Vehicle Picker, Levels) */}
       <GameHUD
         currentVehicle={currentVehicle}

@@ -19,6 +19,19 @@ interface GameCanvasProps {
   lang: 'sv' | 'en';
 }
 
+interface MushroomProp {
+  x: number;
+  squash: number;
+}
+
+interface AnimalProp {
+  x: number;
+  emoji: string;
+  name: string;
+  jumpY: number;
+  jumpVy: number;
+}
+
 export const GameCanvas: React.FC<GameCanvasProps> = ({
   currentVehicle,
   currentLevel,
@@ -38,9 +51,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
   // Mutable Game Simulation State
   const stateRef = useRef({
+    // Canvas dimensions
+    canvasWidth: 800,
+    canvasHeight: 500,
+
     // Car State
     carX: 180,
-    carY: 350,
+    carY: 300,
     vx: 0,
     vy: 0,
     angle: 0,
@@ -56,13 +73,29 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     // Collectibles & Props
     items: [] as CollectibleItem[],
+    bonusItems: [] as { id: string; x: number; y: number; collected: boolean }[],
     particles: [] as Particle[],
-    goalX: 2500,
+    goalX: 6600,
     hasReachedGoal: false,
-    bridgeX: 1100,
+    bridgeX: 3200,
     hasPromptedBridge: false,
-    colorGateX: 1200,
+    colorGateX: 3300,
     hasPromptedColorGate: false,
+
+    // Interactive Props
+    mushrooms: [
+      { x: 1650, squash: 0 },
+      { x: 4700, squash: 0 },
+    ] as MushroomProp[],
+
+    animals: [
+      { x: 1200, emoji: '🐮', name: 'Klara Ko', jumpY: 0, jumpVy: 0 },
+      { x: 2500, emoji: '🐑', name: 'Ulla Ulltuss', jumpY: 0, jumpVy: 0 },
+      { x: 4100, emoji: '🐰', name: 'Pelle Kanin', jumpY: 0, jumpVy: 0 },
+      { x: 5500, emoji: '🐿️', name: 'Nils Ekorre', jumpY: 0, jumpVy: 0 },
+    ] as AnimalProp[],
+
+    windmillAngle: 0,
 
     // Controls state ref to avoid closure staleness
     drivingForward: false,
@@ -91,8 +124,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       const v = VEHICLES.find((v) => v.id === currentVehicle) || VEHICLES[0];
       sounds.playHorn(v.honkSound);
 
-      // Spawn musical note and heart particles
       const state = stateRef.current;
+
+      // Spawn musical note and heart particles
       for (let i = 0; i < 6; i++) {
         state.particles.push({
           x: state.carX + 40,
@@ -107,37 +141,58 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           shape: i % 2 === 0 ? 'note' : 'heart',
         });
       }
+
+      // Make nearby animals happily jump!
+      state.animals.forEach((animal) => {
+        if (Math.abs(state.carX - animal.x) < 450) {
+          animal.jumpVy = -7;
+          state.particles.push({
+            x: animal.x,
+            y: getGroundY(animal.x, state.canvasHeight) - 75,
+            vx: (Math.random() - 0.5) * 3,
+            vy: -3,
+            size: 20,
+            color: '#EC4899',
+            alpha: 1,
+            life: 0,
+            maxLife: 35,
+            shape: 'heart',
+          });
+        }
+      });
     }
   }, [hornTrigger, currentVehicle]);
 
-  // Terrain height calculation function
-  const getGroundY = (x: number): number => {
-    // Flat start area
-    if (x < 300) return 400;
+  // Responsive Dynamic Terrain Height Function
+  const getGroundY = (x: number, viewH: number): number => {
+    const baseGround = Math.max(220, viewH * 0.62);
 
-    // Rolling gentle hills
-    const hill1 = Math.sin(x * 0.0035) * 55;
-    const hill2 = Math.sin(x * 0.009) * 25;
-    const hill3 = Math.cos(x * 0.0015) * 35;
+    // Start flat pad
+    if (x < 350) return baseGround;
 
-    let base = 420 + hill1 + hill2 + hill3;
+    // Rich undulating hills over 7000px
+    const hill1 = Math.sin(x * 0.0022) * 55;
+    const hill2 = Math.sin(x * 0.0055) * 32;
+    const hill3 = Math.cos(x * 0.0011) * 26;
+
+    let base = baseGround + hill1 + hill2 + hill3;
 
     // Bridge gap for level 2 (shapes)
     if (currentLevel.id === 'shapes') {
-      const bridgeStart = 1050;
-      const bridgeEnd = 1350;
+      const bridgeStart = 3100;
+      const bridgeEnd = 3500;
       if (x > bridgeStart && x < bridgeEnd) {
         if (!isShapePuzzleSolved) {
-          // Deep drop if bridge not fixed
-          return 750;
+          // Deep canyon gap if bridge not fixed
+          return baseGround + 320;
         }
-        // Smooth wooden bridge surface when solved
-        return 430;
+        // Smooth sturdy bridge deck when solved
+        return baseGround + 8;
       }
     }
 
-    // Flat goal area at the end
-    if (x > 2300) return 420;
+    // Flat victory goal area at the end
+    if (x > 6450) return baseGround + 15;
 
     return base;
   };
@@ -146,7 +201,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   useEffect(() => {
     const state = stateRef.current;
     state.carX = 160;
-    state.carY = 380;
+    state.carY = 260;
     state.vx = 0;
     state.vy = 0;
     state.angle = 0;
@@ -155,28 +210,39 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     state.hasPromptedColorGate = false;
     state.particles = [];
 
-    // Generate collectibles along the path
-    const items: CollectibleItem[] = [];
-    const stepCount = currentLevel.goalCount;
-    const spacing = 1900 / (stepCount + 1);
+    // Track length ~6700px!
+    state.goalX = 6600;
 
-    for (let i = 1; i <= stepCount; i++) {
-      const x = 320 + i * spacing;
-      const y = getGroundY(x) - 70;
+    // Generate main mission collectibles along the expanded track
+    const items: CollectibleItem[] = [];
+    const mainPositions = [950, 2200, 3750, 5100, 6150];
+
+    for (let i = 0; i < currentLevel.goalCount; i++) {
+      const x = mainPositions[i] || 1000 + i * 1100;
+      const y = getGroundY(x, state.canvasHeight || 500) - 75;
       items.push({
-        id: `item-${i}`,
+        id: `item-${i + 1}`,
         x,
         y,
         collected: false,
         type: currentLevel.itemType,
-        val: i,
+        val: i + 1,
         color: ['#EF4444', '#3B82F6', '#F59E0B', '#10B981', '#A855F7'][i % 5],
         pulsePhase: i * 0.8,
       });
     }
-
     state.items = items;
-    state.goalX = 2450;
+
+    // Generate mini bonus sparkle stars along hilltops
+    const bonusPositions = [
+      600, 700, 800, 1450, 1550, 1750, 2750, 2850, 2950, 4350, 4450, 4550, 5650, 5750, 5850,
+    ];
+    state.bonusItems = bonusPositions.map((bx, idx) => ({
+      id: `bonus-${idx}`,
+      x: bx,
+      y: getGroundY(bx, state.canvasHeight || 500) - 70,
+      collected: false,
+    }));
 
     // Speak introductory mission greeting
     const introSpeech =
@@ -204,6 +270,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       const rect = canvas.getBoundingClientRect();
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
+      stateRef.current.canvasWidth = rect.width;
+      stateRef.current.canvasHeight = rect.height;
       ctx.scale(dpr, dpr);
     };
 
@@ -221,6 +289,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       const rect = canvas.getBoundingClientRect();
       const viewW = rect.width;
       const viewH = rect.height;
+      state.canvasWidth = viewW;
+      state.canvasHeight = viewH;
 
       // 1. Controls & Acceleration
       const maxSpeed = 7.5;
@@ -288,8 +358,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       if (
         currentLevel.id === 'shapes' &&
         !isShapePuzzleSolved &&
-        state.carX >= 1010 &&
-        state.carX <= 1060
+        state.carX >= 3060 &&
+        state.carX <= 3130
       ) {
         state.vx = 0;
         if (!state.hasPromptedBridge) {
@@ -302,8 +372,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       if (
         currentLevel.id === 'colors' &&
         !isColorPuzzleSolved &&
-        state.carX >= 1150 &&
-        state.carX <= 1200
+        state.carX >= 3220 &&
+        state.carX <= 3280
       ) {
         state.vx = 0;
         if (!state.hasPromptedColorGate) {
@@ -323,9 +393,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       }
 
       // Ground Collision & Hill Angle
-      const groundY = getGroundY(state.carX);
-      const groundYAhead = getGroundY(state.carX + 24);
-      const groundYBehind = getGroundY(state.carX - 24);
+      const groundY = getGroundY(state.carX, viewH);
+      const groundYAhead = getGroundY(state.carX + 24, viewH);
+      const groundYBehind = getGroundY(state.carX - 24, viewH);
 
       const targetAngle = Math.atan2(groundYAhead - groundYBehind, 48);
 
@@ -341,9 +411,49 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         state.suspension *= 0.8;
       } else {
         state.isGrounded = false;
-        // In the air, gently level out
         state.angle += (0 - state.angle) * 0.05;
       }
+
+      // Check Bouncy Mushroom Collision
+      state.mushrooms.forEach((m) => {
+        if (m.squash > 0) m.squash = Math.max(0, m.squash - dt * 3);
+        if (Math.abs(state.carX - m.x) < 38 && state.carY >= groundY - 32) {
+          m.squash = 1;
+          state.vy = -16.5; // Super spring launch!
+          state.isGrounded = false;
+          sounds.playJump();
+
+          for (let p = 0; p < 8; p++) {
+            state.particles.push({
+              x: m.x,
+              y: groundY - 20,
+              vx: (Math.random() - 0.5) * 6,
+              vy: -Math.random() * 5 - 2,
+              size: 8,
+              color: ['#EF4444', '#FBBF24', '#3B82F6', '#10B981'][p % 4],
+              alpha: 1,
+              life: 0,
+              maxLife: 28,
+              shape: 'star',
+            });
+          }
+        }
+      });
+
+      // Update Animals jumping physics
+      state.animals.forEach((animal) => {
+        if (animal.jumpY < 0 || animal.jumpVy < 0) {
+          animal.jumpVy += 20 * dt;
+          animal.jumpY += animal.jumpVy;
+          if (animal.jumpY >= 0) {
+            animal.jumpY = 0;
+            animal.jumpVy = 0;
+          }
+        }
+      });
+
+      // Update Windmill rotation
+      state.windmillAngle += dt * 1.2;
 
       // Blink animation
       state.blinkTimer += dt;
@@ -355,17 +465,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
       }
 
-      // Collectibles detection
-      let newlyCollected = 0;
+      // Collectibles detection (Main Mission items)
       state.items.forEach((item) => {
         if (!item.collected) {
           const dx = state.carX - item.x;
           const dy = state.carY - item.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
 
-          if (dist < 50) {
+          if (dist < 52) {
             item.collected = true;
-            newlyCollected++;
             const totalCollected = state.items.filter((i) => i.collected).length;
             sounds.playCollect(totalCollected);
 
@@ -381,17 +489,17 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             onItemCollected(totalCollected, currentLevel.itemType);
 
             // Confetti & star explosion
-            for (let p = 0; p < 12; p++) {
+            for (let p = 0; p < 14; p++) {
               state.particles.push({
                 x: item.x,
                 y: item.y,
-                vx: (Math.random() - 0.5) * 7,
-                vy: -Math.random() * 6 - 2,
-                size: 8 + Math.random() * 6,
+                vx: (Math.random() - 0.5) * 8,
+                vy: -Math.random() * 7 - 2,
+                size: 9 + Math.random() * 6,
                 color: ['#F59E0B', '#EF4444', '#10B981', '#3B82F6', '#EC4899'][p % 5],
                 alpha: 1,
                 life: 0,
-                maxLife: 32,
+                maxLife: 35,
                 shape: 'star',
               });
             }
@@ -399,7 +507,36 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
       });
 
-      // Goal Friend Reach Check
+      // Mini Bonus Stars detection
+      state.bonusItems.forEach((b) => {
+        if (!b.collected) {
+          const dx = state.carX - b.x;
+          const dy = state.carY - b.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < 42) {
+            b.collected = true;
+            sounds.playSnap();
+
+            for (let p = 0; p < 6; p++) {
+              state.particles.push({
+                x: b.x,
+                y: b.y,
+                vx: (Math.random() - 0.5) * 5,
+                vy: -Math.random() * 4 - 1,
+                size: 6,
+                color: '#FDE047',
+                alpha: 1,
+                life: 0,
+                maxLife: 22,
+                shape: 'star',
+              });
+            }
+          }
+        }
+      });
+
+      // Goal Reach Check
       if (!state.hasReachedGoal && state.carX >= state.goalX - 60) {
         state.hasReachedGoal = true;
         sounds.playVictory();
@@ -411,10 +548,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         onGoalReached();
       }
 
-      // Smooth Camera tracking
-      const targetCamX = state.carX - viewW * 0.35;
+      // Smooth Camera tracking (Both horizontal and vertical)
+      const targetCamX = state.carX - viewW * 0.32;
       state.camX += (targetCamX - state.camX) * 0.08;
       if (state.camX < 0) state.camX = 0;
+
+      const targetCamY = state.carY - viewH * 0.52;
+      state.camY += (targetCamY - state.camY) * 0.06;
+      if (state.camY < -60) state.camY = -60;
+      if (state.camY > 100) state.camY = 100;
 
       // ----------------------------------------------------
       // RENDERING CANVAS
@@ -439,15 +581,21 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.stroke();
       ctx.restore();
 
-      // Fluffy Clouds (Parallax)
-      const cloudOffset = state.camX * 0.2;
+      // Fluffy Clouds (Parallax across 7000px)
+      const cloudOffset = state.camX * 0.16;
       [
         { x: 100, y: 70, s: 0.9 },
-        { x: 450, y: 110, s: 1.2 },
-        { x: 900, y: 80, s: 0.8 },
-        { x: 1350, y: 65, s: 1.1 },
-        { x: 1800, y: 95, s: 0.85 },
-        { x: 2300, y: 75, s: 1.0 },
+        { x: 500, y: 110, s: 1.2 },
+        { x: 1000, y: 80, s: 0.8 },
+        { x: 1550, y: 65, s: 1.1 },
+        { x: 2100, y: 95, s: 0.85 },
+        { x: 2700, y: 75, s: 1.0 },
+        { x: 3300, y: 105, s: 1.15 },
+        { x: 3900, y: 70, s: 0.9 },
+        { x: 4500, y: 115, s: 1.1 },
+        { x: 5200, y: 85, s: 0.8 },
+        { x: 5900, y: 95, s: 1.0 },
+        { x: 6500, y: 75, s: 1.2 },
       ].forEach((c) => {
         const renderX = c.x - cloudOffset;
         if (renderX > -150 && renderX < viewW + 150) {
@@ -464,32 +612,35 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       // Distant Hills (Mid-ground parallax)
       ctx.save();
-      ctx.translate(-state.camX * 0.45, 0);
+      ctx.translate(-state.camX * 0.35, -state.camY * 0.2);
       ctx.fillStyle = '#BBF7D0';
       ctx.beginPath();
-      ctx.moveTo(-200, viewH);
-      for (let x = -200; x < 3200; x += 60) {
-        const y = 350 + Math.sin(x * 0.002) * 50 + Math.cos(x * 0.005) * 30;
+      ctx.moveTo(-200, viewH + 200);
+      for (let x = -200; x < 7500; x += 80) {
+        const y = viewH * 0.55 + Math.sin(x * 0.0018) * 45 + Math.cos(x * 0.004) * 25;
         ctx.lineTo(x, y);
       }
-      ctx.lineTo(3200, viewH);
+      ctx.lineTo(7500, viewH + 200);
       ctx.fill();
       ctx.restore();
 
-      // Main Terrain (World coords transformed by camera)
+      // ----------------------------------------------------
+      // MAIN WORLD (Camera Transformed)
+      // ----------------------------------------------------
       ctx.save();
-      ctx.translate(-state.camX, 0);
+      ctx.translate(-state.camX, -state.camY);
 
-      // Ground Fill
+      // Deep Ground Fill
       ctx.beginPath();
-      const startX = Math.max(0, state.camX - 50);
-      const endX = Math.min(3200, state.camX + viewW + 100);
+      const startX = Math.max(0, state.camX - 60);
+      const endX = Math.min(7400, state.camX + viewW + 120);
+      const deepBottom = viewH + 500;
 
-      ctx.moveTo(startX, viewH);
+      ctx.moveTo(startX, deepBottom);
       for (let x = startX; x <= endX; x += 15) {
-        ctx.lineTo(x, getGroundY(x));
+        ctx.lineTo(x, getGroundY(x, viewH));
       }
-      ctx.lineTo(endX, viewH);
+      ctx.lineTo(endX, deepBottom);
       ctx.closePath();
 
       ctx.fillStyle = currentLevel.theme.grassFill;
@@ -499,9 +650,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.beginPath();
       for (let x = startX; x <= endX; x += 15) {
         if (x === startX) {
-          ctx.moveTo(x, getGroundY(x));
+          ctx.moveTo(x, getGroundY(x, viewH));
         } else {
-          ctx.lineTo(x, getGroundY(x));
+          ctx.lineTo(x, getGroundY(x, viewH));
         }
       }
       ctx.strokeStyle = currentLevel.theme.grassOutline;
@@ -510,21 +661,29 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.lineJoin = 'round';
       ctx.stroke();
 
+      // Roadside Props: Wooden Fence at start
+      for (let fx = 120; fx < 360; fx += 40) {
+        const fy = getGroundY(fx, viewH);
+        ctx.fillStyle = '#92400E';
+        ctx.fillRect(fx - 4, fy - 32, 8, 32);
+        ctx.fillRect(fx - 20, fy - 22, 40, 5);
+        ctx.fillRect(fx - 20, fy - 12, 40, 5);
+      }
+
       // Draw Bridge if in shapes level
       if (currentLevel.id === 'shapes') {
-        const bridgeX = 1050;
-        const bridgeW = 300;
-        const bridgeY = 430;
+        const bridgeX = 3100;
+        const bridgeW = 400;
+        const bridgeY = getGroundY(3100, viewH) + 8;
 
         if (isShapePuzzleSolved) {
-          // Repaired wooden plank bridge with golden rivets
+          // Repaired sturdy wooden bridge
           ctx.fillStyle = '#92400E';
           ctx.fillRect(bridgeX, bridgeY - 14, bridgeW, 20);
           ctx.strokeStyle = '#F59E0B';
           ctx.lineWidth = 4;
           ctx.strokeRect(bridgeX, bridgeY - 14, bridgeW, 20);
 
-          // Bridge ropes / arches
           ctx.strokeStyle = '#B45309';
           ctx.lineWidth = 5;
           ctx.beginPath();
@@ -532,13 +691,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           ctx.quadraticCurveTo(bridgeX + bridgeW / 2, bridgeY - 10, bridgeX + bridgeW, bridgeY - 45);
           ctx.stroke();
         } else {
-          // Broken gap with blinking question mark
+          // Warning gap
           ctx.fillStyle = '#EF4444';
           ctx.font = 'bold 24px Fredoka, sans-serif';
           ctx.textAlign = 'center';
           ctx.fillText('⚠️ Laga bron här!', bridgeX + bridgeW / 2, bridgeY + 60);
 
-          // Shape outline slot
           ctx.strokeStyle = '#F59E0B';
           ctx.lineWidth = 4;
           ctx.beginPath();
@@ -550,7 +708,113 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
       }
 
-      // Draw Collectibles along path
+      // Draw Bouncy Mushrooms
+      state.mushrooms.forEach((m) => {
+        const my = getGroundY(m.x, viewH);
+        ctx.save();
+        ctx.translate(m.x, my);
+        ctx.scale(1, 1 - m.squash * 0.45);
+
+        // White stem
+        ctx.fillStyle = '#F8FAFC';
+        ctx.beginPath();
+        ctx.roundRect(-10, -22, 20, 22, 4);
+        ctx.fill();
+        ctx.strokeStyle = '#CBD5E1';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Red bouncy cap
+        ctx.fillStyle = '#EF4444';
+        ctx.beginPath();
+        ctx.arc(0, -22, 24, Math.PI, 0);
+        ctx.fill();
+        ctx.strokeStyle = '#991B1B';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // White polka dots
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(-11, -28, 4, 0, Math.PI * 2);
+        ctx.arc(0, -34, 5, 0, Math.PI * 2);
+        ctx.arc(11, -28, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      });
+
+      // Draw Windmill at x=4200
+      const wmX = 4250;
+      const wmY = getGroundY(wmX, viewH);
+      ctx.save();
+      ctx.translate(wmX, wmY);
+
+      // Stone tower
+      ctx.fillStyle = '#94A3B8';
+      ctx.beginPath();
+      ctx.moveTo(-24, 0);
+      ctx.lineTo(24, 0);
+      ctx.lineTo(16, -110);
+      ctx.lineTo(-16, -110);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Roof
+      ctx.fillStyle = '#DC2626';
+      ctx.beginPath();
+      ctx.moveTo(-20, -110);
+      ctx.lineTo(20, -110);
+      ctx.lineTo(0, -135);
+      ctx.closePath();
+      ctx.fill();
+
+      // Rotating blades
+      ctx.save();
+      ctx.translate(0, -95);
+      ctx.rotate(state.windmillAngle);
+      for (let b = 0; b < 4; b++) {
+        ctx.rotate(Math.PI / 2);
+        ctx.fillStyle = '#F8FAFC';
+        ctx.strokeStyle = '#78350F';
+        ctx.lineWidth = 2;
+        ctx.fillRect(-4, -60, 8, 60);
+        ctx.strokeRect(-4, -60, 8, 60);
+      }
+      ctx.restore();
+      ctx.restore();
+
+      // Draw Friendly Roadside Animals
+      state.animals.forEach((animal) => {
+        const ay = getGroundY(animal.x, viewH);
+        ctx.save();
+        ctx.translate(animal.x, ay - 32 + animal.jumpY);
+        ctx.font = '52px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(animal.emoji, 0, 0);
+        ctx.restore();
+      });
+
+      // Draw Mini Bonus Stars
+      state.bonusItems.forEach((b) => {
+        if (!b.collected) {
+          ctx.save();
+          ctx.translate(b.x, b.y);
+          ctx.fillStyle = '#FDE047';
+          ctx.beginPath();
+          ctx.arc(0, 0, 8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#EAB308';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.restore();
+        }
+      });
+
+      // Draw Main Mission Collectibles along the route
       state.items.forEach((item) => {
         if (!item.collected) {
           item.pulsePhase += dt * 3;
@@ -585,26 +849,23 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             ctx.arc(-6, -6, 5, 0, Math.PI * 2);
             ctx.fill();
           } else if (item.type === 'shapeKey') {
-            // Magical Shape Key
             ctx.fillStyle = '#F59E0B';
             ctx.beginPath();
-            ctx.arc(0, 0, 20, 0, Math.PI * 2);
+            ctx.arc(0, 0, 22, 0, Math.PI * 2);
             ctx.fill();
             ctx.strokeStyle = '#FEF08A';
             ctx.lineWidth = 4;
             ctx.stroke();
 
-            // Inner star
             ctx.fillStyle = '#FFFFFF';
-            ctx.font = '22px sans-serif';
+            ctx.font = '24px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('🔺', 0, 0);
           } else if (item.type === 'colorOrb') {
-            // Color Orb
             ctx.fillStyle = item.color || '#3B82F6';
             ctx.beginPath();
-            ctx.arc(0, 0, 18, 0, Math.PI * 2);
+            ctx.arc(0, 0, 20, 0, Math.PI * 2);
             ctx.fill();
             ctx.strokeStyle = '#FFFFFF';
             ctx.lineWidth = 4;
@@ -614,8 +875,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             ctx.fillStyle = '#FBBF24';
             ctx.beginPath();
             for (let s = 0; s < 5; s++) {
-              const r1 = 20;
-              const r2 = 9;
+              const r1 = 22;
+              const r2 = 10;
               const a = (s * Math.PI) / 2.5 - Math.PI / 2;
               const aMid = a + Math.PI / 5;
               if (s === 0) {
@@ -637,23 +898,23 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       });
 
       // Goal Friend (e.g. Hästen Harald, Draken Diddi)
-      const goalY = getGroundY(state.goalX);
+      const goalY = getGroundY(state.goalX, viewH);
       ctx.save();
       ctx.translate(state.goalX, goalY - 45);
 
-      // Goal Flag / Banner
+      // Finish Arch / Flag
       ctx.fillStyle = '#E2E8F0';
-      ctx.fillRect(-8, -90, 8, 90);
+      ctx.fillRect(-8, -100, 10, 100);
       ctx.fillStyle = '#EF4444';
       ctx.beginPath();
-      ctx.moveTo(0, -90);
-      ctx.lineTo(55, -70);
+      ctx.moveTo(0, -100);
+      ctx.lineTo(65, -75);
       ctx.lineTo(0, -50);
       ctx.closePath();
       ctx.fill();
 
-      // Friendly Animal Avatar
-      ctx.font = '68px sans-serif';
+      // Cheering Animal Avatar
+      ctx.font = '76px sans-serif';
       ctx.textAlign = 'center';
       const animalEmoji =
         currentLevel.friendAnimal === 'horse'
@@ -663,24 +924,24 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           : currentLevel.friendAnimal === 'bear'
           ? '🐻'
           : '🐢';
-      ctx.fillText(animalEmoji, 25, 10);
+      ctx.fillText(animalEmoji, 30, 10);
 
-      // Animal Speech bubble if not reached yet
+      // Speech bubble if not reached yet
       if (!state.hasReachedGoal) {
         ctx.fillStyle = '#FFFFFF';
         ctx.strokeStyle = '#0F172A';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
-        ctx.roundRect(-40, -135, 130, 36, 12);
+        ctx.roundRect(-45, -145, 150, 40, 14);
         ctx.fill();
         ctx.stroke();
         ctx.fillStyle = '#0F172A';
-        ctx.font = 'bold 15px Fredoka, sans-serif';
+        ctx.font = 'bold 16px Fredoka, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(
           lang === 'sv' ? 'Mums! Äpplen! 🍎' : 'Yum! Apples! 🍎',
-          25,
-          -112
+          30,
+          -120
         );
       }
 
@@ -696,7 +957,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       const carColor = vehicleConfig.color;
       const wheelCol = vehicleConfig.wheelColor;
 
-      // Body (Chunky rounded toy chassis)
+      // Chassis body
       ctx.fillStyle = carColor;
       ctx.strokeStyle = '#0F172A';
       ctx.lineWidth = 3.5;
@@ -715,7 +976,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       // Cute Eyes on windshield!
       ctx.fillStyle = '#0F172A';
       if (state.isBlinking) {
-        // Closed happy eyes ^ ^
         ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.arc(8, -31, 5, Math.PI, 0);
@@ -724,7 +984,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.arc(22, -31, 5, Math.PI, 0);
         ctx.stroke();
       } else {
-        // Big round friendly eyes with shine
         ctx.beginPath();
         ctx.arc(8, -31, 5, 0, Math.PI * 2);
         ctx.arc(22, -31, 5, 0, Math.PI * 2);
@@ -736,7 +995,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.fill();
       }
 
-      // Roof item (Flashing Siren for Firetruck, Chimney for Tractor, Antenna for Rover)
+      // Roof siren / chimney
       if (vehicleConfig.roofLight) {
         const sirenColor = Math.floor(now / 150) % 2 === 0 ? '#3B82F6' : '#EF4444';
         ctx.fillStyle = sirenColor;
@@ -747,7 +1006,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.lineWidth = 2;
         ctx.stroke();
       } else if (currentVehicle === 'tractor') {
-        // Tractor exhaust chimney
         ctx.fillStyle = '#475569';
         ctx.fillRect(-22, -46, 7, 24);
         ctx.strokeStyle = '#0F172A';
@@ -764,13 +1022,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Wheels (Animated rotation)
+      // Wheels
       const drawWheel = (wx: number, wy: number, r: number) => {
         ctx.save();
         ctx.translate(wx, wy);
         ctx.rotate(state.wheelAngle);
 
-        // Tire
         ctx.fillStyle = wheelCol;
         ctx.beginPath();
         ctx.arc(0, 0, r, 0, Math.PI * 2);
@@ -779,13 +1036,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.lineWidth = 3.5;
         ctx.stroke();
 
-        // Hubcap rim
         ctx.fillStyle = '#F8FAFC';
         ctx.beginPath();
         ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2);
         ctx.fill();
 
-        // Hub spoke dots
         ctx.fillStyle = '#0F172A';
         ctx.beginPath();
         ctx.arc(r * 0.25, 0, 2.5, 0, Math.PI * 2);
@@ -796,8 +1051,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       };
 
       if (currentVehicle === 'tractor') {
-        drawWheel(-22, 6, 17); // Big back wheel
-        drawWheel(24, 6, 11);  // Smaller front wheel
+        drawWheel(-22, 6, 17);
+        drawWheel(24, 6, 11);
       } else {
         drawWheel(-22, 6, 13);
         drawWheel(22, 6, 13);
@@ -806,7 +1061,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.restore();
 
       // ----------------------------------------------------
-      // PARTICLES (Smoke, notes, stars)
+      // PARTICLES (Smoke, notes, hearts, stars)
       // ----------------------------------------------------
       for (let i = state.particles.length - 1; i >= 0; i--) {
         const p = state.particles[i];

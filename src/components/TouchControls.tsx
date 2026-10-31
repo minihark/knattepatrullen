@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, ArrowRight, ArrowUp, Volume2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUp } from 'lucide-react';
 import { VehicleConfig } from '../types';
 
 interface TouchControlsProps {
@@ -26,7 +26,7 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
   lang,
 }) => {
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-4 px-4 sm:px-8 flex justify-between items-end z-20">
+    <div className="pointer-events-none absolute inset-x-0 bottom-6 sm:bottom-10 pb-[env(safe-area-inset-bottom,24px)] px-5 sm:px-12 flex justify-between items-end z-30 select-none">
       {/* LEFT SIDE: Steering / Drive Controls */}
       <div className="pointer-events-auto flex items-center gap-3 sm:gap-5">
         {/* Reverse / Backa Button */}
@@ -45,10 +45,10 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
             e.preventDefault();
             onDriveBackwardEnd();
           }}
-          className="w-18 h-18 sm:w-22 sm:h-22 rounded-3xl bg-amber-100/90 active:bg-amber-200 border-4 border-amber-400 active:scale-95 shadow-lg active:shadow-md transition-all flex flex-col items-center justify-center select-none touch-none"
+          className="w-[76px] h-[76px] sm:w-[88px] sm:h-[88px] rounded-3xl bg-amber-100/95 active:bg-amber-200 border-4 border-amber-400 active:scale-95 shadow-xl transition-all flex flex-col items-center justify-center select-none touch-none ring-2 ring-black/10"
         >
-          <ArrowLeft className="w-8 h-8 sm:w-10 sm:h-10 text-amber-700 stroke-[3]" />
-          <span className="text-[12px] sm:text-sm font-bold text-amber-800 tracking-wide mt-0.5">
+          <ArrowLeft className="w-8 h-8 sm:w-10 sm:h-10 text-amber-800 stroke-[3.5]" />
+          <span className="text-[12px] sm:text-xs font-black text-amber-900 tracking-wider mt-0.5">
             {lang === 'sv' ? 'BACKA' : 'BACK'}
           </span>
         </button>
@@ -69,10 +69,10 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
             e.preventDefault();
             onDriveForwardEnd();
           }}
-          className="w-22 h-22 sm:w-26 sm:h-26 rounded-3xl bg-emerald-500 active:bg-emerald-600 border-4 border-emerald-300 active:scale-95 shadow-xl active:shadow-md transition-all flex flex-col items-center justify-center select-none touch-none"
+          className="w-[96px] h-[96px] sm:w-[112px] sm:h-[112px] rounded-3xl bg-emerald-500 active:bg-emerald-600 border-4 border-emerald-300 active:scale-95 shadow-2xl transition-all flex flex-col items-center justify-center select-none touch-none ring-4 ring-emerald-500/25"
         >
-          <ArrowRight className="w-10 h-10 sm:w-12 sm:h-12 text-white stroke-[3.5]" />
-          <span className="text-sm sm:text-base font-extrabold text-white tracking-wider mt-0.5">
+          <ArrowRight className="w-11 h-11 sm:w-13 sm:h-13 text-white stroke-[3.5]" />
+          <span className="text-sm sm:text-base font-black text-white tracking-wider mt-0.5">
             {lang === 'sv' ? 'KÖR! 🚀' : 'GO! 🚀'}
           </span>
         </button>
@@ -88,10 +88,10 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
             e.preventDefault();
             onHonk();
           }}
-          className="w-18 h-18 sm:w-22 sm:h-22 rounded-3xl bg-amber-400 active:bg-amber-500 border-4 border-amber-200 active:scale-90 shadow-lg active:shadow-md transition-all flex flex-col items-center justify-center select-none touch-none animate-pulse"
+          className="w-[76px] h-[76px] sm:w-[88px] sm:h-[88px] rounded-3xl bg-amber-400 active:bg-amber-500 border-4 border-amber-200 active:scale-90 shadow-xl transition-all flex flex-col items-center justify-center select-none touch-none ring-2 ring-black/10 animate-pulse"
         >
-          <span className="text-2xl sm:text-3xl leading-none">{vehicle.hornEmoji}</span>
-          <span className="text-[12px] sm:text-sm font-extrabold text-amber-950 tracking-wider mt-1">
+          <span className="text-3xl sm:text-4xl leading-none">{vehicle.hornEmoji}</span>
+          <span className="text-[12px] sm:text-xs font-black text-amber-950 tracking-wider mt-1">
             {lang === 'sv' ? 'TUTA!' : 'HONK!'}
           </span>
         </button>
@@ -112,10 +112,10 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
             e.preventDefault();
             onJumpEnd();
           }}
-          className="w-22 h-22 sm:w-26 sm:h-26 rounded-3xl bg-sky-500 active:bg-sky-600 border-4 border-sky-300 active:scale-95 shadow-xl active:shadow-md transition-all flex flex-col items-center justify-center select-none touch-none"
+          className="w-[96px] h-[96px] sm:w-[112px] sm:h-[112px] rounded-3xl bg-sky-500 active:bg-sky-600 border-4 border-sky-300 active:scale-95 shadow-2xl transition-all flex flex-col items-center justify-center select-none touch-none ring-4 ring-sky-500/25"
         >
-          <ArrowUp className="w-10 h-10 sm:w-12 sm:h-12 text-white stroke-[3.5]" />
-          <span className="text-sm sm:text-base font-extrabold text-white tracking-wider mt-0.5">
+          <ArrowUp className="w-11 h-11 sm:w-13 sm:h-13 text-white stroke-[3.5]" />
+          <span className="text-sm sm:text-base font-black text-white tracking-wider mt-0.5">
             {lang === 'sv' ? 'HOPPA! 🦘' : 'JUMP! 🦘'}
           </span>
         </button>
