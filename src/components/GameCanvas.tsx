@@ -12,6 +12,11 @@ interface GameCanvasProps {
   isShapePuzzleSolved: boolean;
   onRequestColorPuzzle: (requiredColor: 'red' | 'blue' | 'yellow' | 'green') => void;
   isColorPuzzleSolved: boolean;
+  onRequestLetterPuzzle: () => void;
+  isLetterPuzzleSolved: boolean;
+  onRequestAdditionPuzzle: () => void;
+  isAdditionPuzzleSolved: boolean;
+  starsEarned: number;
   drivingForward: boolean;
   drivingBackward: boolean;
   isJumping: boolean;
@@ -41,6 +46,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   isShapePuzzleSolved,
   onRequestColorPuzzle,
   isColorPuzzleSolved,
+  onRequestLetterPuzzle,
+  isLetterPuzzleSolved,
+  onRequestAdditionPuzzle,
+  isAdditionPuzzleSolved,
+  starsEarned,
   drivingForward,
   drivingBackward,
   isJumping,
@@ -78,9 +88,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     goalX: 6600,
     hasReachedGoal: false,
     bridgeX: 3200,
-    hasPromptedBridge: false,
-    colorGateX: 3300,
-    hasPromptedColorGate: false,
+    hasPromptedCheckpoint: false,
 
     // Interactive Props
     mushrooms: [
@@ -97,7 +105,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     windmillAngle: 0,
 
-    // Controls state ref to avoid closure staleness
+    // Controls state ref
     drivingForward: false,
     drivingBackward: false,
     isJumping: false,
@@ -142,7 +150,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         });
       }
 
-      // Make nearby animals happily jump!
+      // Animals jump!
       state.animals.forEach((animal) => {
         if (Math.abs(state.carX - animal.x) < 450) {
           animal.jumpVy = -7;
@@ -163,35 +171,50 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     }
   }, [hornTrigger, currentVehicle]);
 
+  // Check if current checkpoint is solved
+  const isCurrentCheckpointSolved = (): boolean => {
+    if (currentLevel.id === 'shapes') return isShapePuzzleSolved;
+    if (currentLevel.id === 'letters') return isLetterPuzzleSolved;
+    if (currentLevel.id === 'math') return isAdditionPuzzleSolved;
+    if (currentLevel.id === 'colors') return isColorPuzzleSolved;
+    // For replay / mastery with 6+ stars
+    if (starsEarned >= 6) {
+      return isAdditionPuzzleSolved || isLetterPuzzleSolved;
+    }
+    return true;
+  };
+
   // Responsive Dynamic Terrain Height Function
   const getGroundY = (x: number, viewH: number): number => {
     const baseGround = Math.max(220, viewH * 0.62);
 
-    // Start flat pad
     if (x < 350) return baseGround;
 
-    // Rich undulating hills over 7000px
     const hill1 = Math.sin(x * 0.0022) * 55;
     const hill2 = Math.sin(x * 0.0055) * 32;
     const hill3 = Math.cos(x * 0.0011) * 26;
 
     let base = baseGround + hill1 + hill2 + hill3;
 
-    // Bridge gap for level 2 (shapes)
-    if (currentLevel.id === 'shapes') {
+    // Checkpoint bridge gap at 3100-3500
+    const hasCheckpoint =
+      currentLevel.id === 'shapes' ||
+      currentLevel.id === 'letters' ||
+      currentLevel.id === 'math' ||
+      currentLevel.id === 'colors' ||
+      starsEarned >= 6;
+
+    if (hasCheckpoint) {
       const bridgeStart = 3100;
       const bridgeEnd = 3500;
       if (x > bridgeStart && x < bridgeEnd) {
-        if (!isShapePuzzleSolved) {
-          // Deep canyon gap if bridge not fixed
-          return baseGround + 320;
+        if (!isCurrentCheckpointSolved()) {
+          return baseGround + 320; // Canyon drop before solving
         }
-        // Smooth sturdy bridge deck when solved
-        return baseGround + 8;
+        return baseGround + 8; // Solved sturdy bridge
       }
     }
 
-    // Flat victory goal area at the end
     if (x > 6450) return baseGround + 15;
 
     return base;
@@ -206,11 +229,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     state.vy = 0;
     state.angle = 0;
     state.hasReachedGoal = false;
-    state.hasPromptedBridge = false;
-    state.hasPromptedColorGate = false;
+    state.hasPromptedCheckpoint = false;
     state.particles = [];
 
-    // Track length ~6700px!
     state.goalX = 6600;
 
     // Generate main mission collectibles along the expanded track
@@ -302,7 +323,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         if (state.vx > maxSpeed) state.vx = maxSpeed;
         state.wheelAngle += state.vx * 0.12;
 
-        // Smoke / dust puff
         if (Math.random() < 0.25 && state.isGrounded) {
           state.particles.push({
             x: state.carX - 32,
@@ -334,7 +354,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         state.suspension = -10;
         sounds.playJump();
 
-        // Jump sparkle particles
         for (let i = 0; i < 5; i++) {
           state.particles.push({
             x: state.carX,
@@ -354,31 +373,28 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       // Gravity
       state.vy += 22.0 * dt;
 
-      // Check Bridge obstacle for Level 2 (Shapes)
-      if (
-        currentLevel.id === 'shapes' &&
-        !isShapePuzzleSolved &&
-        state.carX >= 3060 &&
-        state.carX <= 3130
-      ) {
+      // Checkpoint Obstacle Check
+      const isSolved = isCurrentCheckpointSolved();
+      if (!isSolved && state.carX >= 3060 && state.carX <= 3130) {
         state.vx = 0;
-        if (!state.hasPromptedBridge) {
-          state.hasPromptedBridge = true;
-          onRequestShapePuzzle('triangle');
-        }
-      }
-
-      // Check Color Gate obstacle for Level 3 (Colors)
-      if (
-        currentLevel.id === 'colors' &&
-        !isColorPuzzleSolved &&
-        state.carX >= 3220 &&
-        state.carX <= 3280
-      ) {
-        state.vx = 0;
-        if (!state.hasPromptedColorGate) {
-          state.hasPromptedColorGate = true;
-          onRequestColorPuzzle('blue');
+        if (!state.hasPromptedCheckpoint) {
+          state.hasPromptedCheckpoint = true;
+          if (currentLevel.id === 'shapes') {
+            onRequestShapePuzzle('triangle');
+          } else if (currentLevel.id === 'letters') {
+            onRequestLetterPuzzle();
+          } else if (currentLevel.id === 'math') {
+            onRequestAdditionPuzzle();
+          } else if (currentLevel.id === 'colors') {
+            onRequestColorPuzzle('blue');
+          } else if (starsEarned >= 6) {
+            // Progressive mastery: alternates between letter and math
+            if (starsEarned % 2 === 0) {
+              onRequestAdditionPuzzle();
+            } else {
+              onRequestLetterPuzzle();
+            }
+          }
         }
       }
 
@@ -386,7 +402,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       state.carX += state.vx;
       state.carY += state.vy;
 
-      // Prevent driving too far left
       if (state.carX < 80) {
         state.carX = 80;
         state.vx = 0;
@@ -404,22 +419,19 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         state.vy = 0;
         state.isGrounded = true;
 
-        // Smoothly match terrain angle
         state.angle += (targetAngle - state.angle) * 0.25;
-
-        // Dampen suspension
         state.suspension *= 0.8;
       } else {
         state.isGrounded = false;
         state.angle += (0 - state.angle) * 0.05;
       }
 
-      // Check Bouncy Mushroom Collision
+      // Bouncy Mushroom Collision
       state.mushrooms.forEach((m) => {
         if (m.squash > 0) m.squash = Math.max(0, m.squash - dt * 3);
         if (Math.abs(state.carX - m.x) < 38 && state.carY >= groundY - 32) {
           m.squash = 1;
-          state.vy = -16.5; // Super spring launch!
+          state.vy = -16.5;
           state.isGrounded = false;
           sounds.playJump();
 
@@ -452,7 +464,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
       });
 
-      // Update Windmill rotation
       state.windmillAngle += dt * 1.2;
 
       // Blink animation
@@ -477,7 +488,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             const totalCollected = state.items.filter((i) => i.collected).length;
             sounds.playCollect(totalCollected);
 
-            // Spoken count for kids!
             const countSwedish = ['Ett!', 'Två!', 'Tre!', 'Fyra!', 'Fem!'];
             const countEnglish = ['One!', 'Two!', 'Three!', 'Four!', 'Five!'];
             const countWord =
@@ -488,7 +498,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             sounds.speak(countWord, lang);
             onItemCollected(totalCollected, currentLevel.itemType);
 
-            // Confetti & star explosion
             for (let p = 0; p < 14; p++) {
               state.particles.push({
                 x: item.x,
@@ -610,7 +619,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
       });
 
-      // Distant Hills (Mid-ground parallax)
+      // Distant Hills
       ctx.save();
       ctx.translate(-state.camX * 0.35, -state.camY * 0.2);
       ctx.fillStyle = '#BBF7D0';
@@ -625,7 +634,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.restore();
 
       // ----------------------------------------------------
-      // MAIN WORLD (Camera Transformed)
+      // MAIN WORLD
       // ----------------------------------------------------
       ctx.save();
       ctx.translate(-state.camX, -state.camY);
@@ -661,7 +670,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.lineJoin = 'round';
       ctx.stroke();
 
-      // Roadside Props: Wooden Fence at start
+      // Wooden Fence at start
       for (let fx = 120; fx < 360; fx += 40) {
         const fy = getGroundY(fx, viewH);
         ctx.fillStyle = '#92400E';
@@ -670,52 +679,66 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.fillRect(fx - 20, fy - 12, 40, 5);
       }
 
-      // Draw Bridge if in shapes level
-      if (currentLevel.id === 'shapes') {
-        const bridgeX = 3100;
-        const bridgeW = 400;
-        const bridgeY = getGroundY(3100, viewH) + 8;
+      // Draw Checkpoint Bridge
+      const bridgeX = 3100;
+      const bridgeW = 400;
+      const bridgeY = getGroundY(3100, viewH) + 8;
+      const solved = isCurrentCheckpointSolved();
 
-        if (isShapePuzzleSolved) {
-          // Repaired sturdy wooden bridge
-          ctx.fillStyle = '#92400E';
-          ctx.fillRect(bridgeX, bridgeY - 14, bridgeW, 20);
-          ctx.strokeStyle = '#F59E0B';
-          ctx.lineWidth = 4;
-          ctx.strokeRect(bridgeX, bridgeY - 14, bridgeW, 20);
+      if (solved) {
+        // Repaired sturdy bridge with flags
+        ctx.fillStyle = '#92400E';
+        ctx.fillRect(bridgeX, bridgeY - 14, bridgeW, 20);
+        ctx.strokeStyle = '#F59E0B';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(bridgeX, bridgeY - 14, bridgeW, 20);
 
-          ctx.strokeStyle = '#B45309';
-          ctx.lineWidth = 5;
-          ctx.beginPath();
-          ctx.moveTo(bridgeX, bridgeY - 45);
-          ctx.quadraticCurveTo(bridgeX + bridgeW / 2, bridgeY - 10, bridgeX + bridgeW, bridgeY - 45);
-          ctx.stroke();
-        } else {
-          // Warning gap
-          ctx.fillStyle = '#EF4444';
-          ctx.font = 'bold 24px Fredoka, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('⚠️ Laga bron här!', bridgeX + bridgeW / 2, bridgeY + 60);
+        ctx.strokeStyle = '#B45309';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(bridgeX, bridgeY - 45);
+        ctx.quadraticCurveTo(bridgeX + bridgeW / 2, bridgeY - 10, bridgeX + bridgeW, bridgeY - 45);
+        ctx.stroke();
 
-          ctx.strokeStyle = '#F59E0B';
-          ctx.lineWidth = 4;
-          ctx.beginPath();
-          ctx.moveTo(bridgeX + bridgeW / 2, bridgeY - 20);
-          ctx.lineTo(bridgeX + bridgeW / 2 - 25, bridgeY + 25);
-          ctx.lineTo(bridgeX + bridgeW / 2 + 25, bridgeY + 25);
-          ctx.closePath();
-          ctx.stroke();
-        }
+        // Celebration pennant flags
+        ['🚩', '⭐', '🎈'].forEach((icon, idx) => {
+          ctx.font = '24px sans-serif';
+          ctx.fillText(icon, bridgeX + 70 + idx * 120, bridgeY - 45);
+        });
+      } else {
+        // Warning Gap with Puzzle prompt banner
+        ctx.fillStyle = '#EF4444';
+        ctx.font = 'bold 22px Fredoka, sans-serif';
+        ctx.textAlign = 'center';
+
+        const label =
+          currentLevel.id === 'letters'
+            ? '🔤 Hitta bokstaven här!'
+            : currentLevel.id === 'math'
+            ? '➕ Lös plus-talet här!'
+            : currentLevel.id === 'shapes'
+            ? '🔺 Laga bron här!'
+            : '⭐ Lås upp banan här!';
+
+        ctx.fillText(label, bridgeX + bridgeW / 2, bridgeY + 60);
+
+        ctx.strokeStyle = '#F59E0B';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(bridgeX + bridgeW / 2, bridgeY - 20);
+        ctx.lineTo(bridgeX + bridgeW / 2 - 25, bridgeY + 25);
+        ctx.lineTo(bridgeX + bridgeW / 2 + 25, bridgeY + 25);
+        ctx.closePath();
+        ctx.stroke();
       }
 
-      // Draw Bouncy Mushrooms
+      // Bouncy Mushrooms
       state.mushrooms.forEach((m) => {
         const my = getGroundY(m.x, viewH);
         ctx.save();
         ctx.translate(m.x, my);
         ctx.scale(1, 1 - m.squash * 0.45);
 
-        // White stem
         ctx.fillStyle = '#F8FAFC';
         ctx.beginPath();
         ctx.roundRect(-10, -22, 20, 22, 4);
@@ -724,7 +747,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Red bouncy cap
         ctx.fillStyle = '#EF4444';
         ctx.beginPath();
         ctx.arc(0, -22, 24, Math.PI, 0);
@@ -733,7 +755,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.lineWidth = 2.5;
         ctx.stroke();
 
-        // White polka dots
         ctx.fillStyle = '#FFFFFF';
         ctx.beginPath();
         ctx.arc(-11, -28, 4, 0, Math.PI * 2);
@@ -744,13 +765,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.restore();
       });
 
-      // Draw Windmill at x=4200
+      // Windmill
       const wmX = 4250;
       const wmY = getGroundY(wmX, viewH);
       ctx.save();
       ctx.translate(wmX, wmY);
 
-      // Stone tower
       ctx.fillStyle = '#94A3B8';
       ctx.beginPath();
       ctx.moveTo(-24, 0);
@@ -763,7 +783,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.lineWidth = 3;
       ctx.stroke();
 
-      // Roof
       ctx.fillStyle = '#DC2626';
       ctx.beginPath();
       ctx.moveTo(-20, -110);
@@ -772,7 +791,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.closePath();
       ctx.fill();
 
-      // Rotating blades
       ctx.save();
       ctx.translate(0, -95);
       ctx.rotate(state.windmillAngle);
@@ -787,7 +805,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.restore();
       ctx.restore();
 
-      // Draw Friendly Roadside Animals
+      // Animals
       state.animals.forEach((animal) => {
         const ay = getGroundY(animal.x, viewH);
         ctx.save();
@@ -798,7 +816,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.restore();
       });
 
-      // Draw Mini Bonus Stars
+      // Mini Bonus Stars
       state.bonusItems.forEach((b) => {
         if (!b.collected) {
           ctx.save();
@@ -814,7 +832,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
       });
 
-      // Draw Main Mission Collectibles along the route
+      // Main Collectibles (Supports apples, shapes, letters, numbers, stars)
       state.items.forEach((item) => {
         if (!item.collected) {
           item.pulsePhase += dt * 3;
@@ -824,14 +842,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           ctx.translate(item.x, floatY);
 
           if (item.type === 'apple') {
-            // Shiny red apple
             ctx.fillStyle = '#DC2626';
             ctx.beginPath();
             ctx.arc(-8, 0, 16, 0, Math.PI * 2);
             ctx.arc(8, 0, 16, 0, Math.PI * 2);
             ctx.fill();
 
-            // Leaf & stem
             ctx.fillStyle = '#15803D';
             ctx.beginPath();
             ctx.ellipse(4, -18, 9, 5, Math.PI / 4, 0, Math.PI * 2);
@@ -843,11 +859,45 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             ctx.lineTo(0, -20);
             ctx.stroke();
 
-            // Highlight shine
             ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
             ctx.beginPath();
             ctx.arc(-6, -6, 5, 0, Math.PI * 2);
             ctx.fill();
+          } else if (item.type === 'letter') {
+            // Wooden Letter Block (e.g. A, B, C, D, E)
+            const letters = ['A', 'B', 'C', 'D', 'E'];
+            const char = letters[item.val ? Number(item.val) - 1 : 0] || 'A';
+
+            ctx.fillStyle = '#FEF3C7';
+            ctx.beginPath();
+            ctx.roundRect(-18, -18, 36, 36, 8);
+            ctx.fill();
+            ctx.strokeStyle = '#D97706';
+            ctx.lineWidth = 3.5;
+            ctx.stroke();
+
+            ctx.fillStyle = '#92400E';
+            ctx.font = 'bold 24px Fredoka, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(char, 0, 2);
+          } else if (item.type === 'number') {
+            // Math number crystal
+            const numChar = String(item.val || 1);
+
+            ctx.fillStyle = '#E0E7FF';
+            ctx.beginPath();
+            ctx.roundRect(-18, -18, 36, 36, 8);
+            ctx.fill();
+            ctx.strokeStyle = '#4F46E5';
+            ctx.lineWidth = 3.5;
+            ctx.stroke();
+
+            ctx.fillStyle = '#312E81';
+            ctx.font = 'bold 24px Fredoka, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(numChar, 0, 2);
           } else if (item.type === 'shapeKey') {
             ctx.fillStyle = '#F59E0B';
             ctx.beginPath();
@@ -871,7 +921,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             ctx.lineWidth = 4;
             ctx.stroke();
           } else {
-            // Golden Star
+            // Star
             ctx.fillStyle = '#FBBF24';
             ctx.beginPath();
             for (let s = 0; s < 5; s++) {
@@ -897,12 +947,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
       });
 
-      // Goal Friend (e.g. Hästen Harald, Draken Diddi)
+      // Goal Friend
       const goalY = getGroundY(state.goalX, viewH);
       ctx.save();
       ctx.translate(state.goalX, goalY - 45);
 
-      // Finish Arch / Flag
       ctx.fillStyle = '#E2E8F0';
       ctx.fillRect(-8, -100, 10, 100);
       ctx.fillStyle = '#EF4444';
@@ -913,7 +962,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.closePath();
       ctx.fill();
 
-      // Cheering Animal Avatar
       ctx.font = '76px sans-serif';
       ctx.textAlign = 'center';
       const animalEmoji =
@@ -921,35 +969,40 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           ? '🐴'
           : currentLevel.friendAnimal === 'dragon'
           ? '🐲'
+          : currentLevel.friendAnimal === 'monkey'
+          ? '🐵'
+          : currentLevel.friendAnimal === 'beaver'
+          ? '🦫'
           : currentLevel.friendAnimal === 'bear'
           ? '🐻'
           : '🐢';
       ctx.fillText(animalEmoji, 30, 10);
 
-      // Speech bubble if not reached yet
       if (!state.hasReachedGoal) {
         ctx.fillStyle = '#FFFFFF';
         ctx.strokeStyle = '#0F172A';
         ctx.lineWidth = 2.5;
         ctx.beginPath();
-        ctx.roundRect(-45, -145, 150, 40, 14);
+        ctx.roundRect(-45, -145, 160, 40, 14);
         ctx.fill();
         ctx.stroke();
         ctx.fillStyle = '#0F172A';
-        ctx.font = 'bold 16px Fredoka, sans-serif';
+        ctx.font = 'bold 15px Fredoka, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(
-          lang === 'sv' ? 'Mums! Äpplen! 🍎' : 'Yum! Apples! 🍎',
-          30,
-          -120
-        );
+
+        const speech =
+          currentLevel.friendAnimal === 'monkey'
+            ? lang === 'sv' ? 'Hej på dig! 🔤' : 'Hello there! 🔤'
+            : currentLevel.friendAnimal === 'beaver'
+            ? lang === 'sv' ? 'Klarar du plus? 🧮' : 'Can you add? 🧮'
+            : lang === 'sv' ? 'Mums! Äpplen! 🍎' : 'Yum! Apples! 🍎';
+
+        ctx.fillText(speech, 35, -120);
       }
 
       ctx.restore();
 
-      // ----------------------------------------------------
-      // DRAW VEHICLE
-      // ----------------------------------------------------
+      // Vehicle
       ctx.save();
       ctx.translate(state.carX, state.carY + state.suspension);
       ctx.rotate(state.angle);
@@ -957,7 +1010,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       const carColor = vehicleConfig.color;
       const wheelCol = vehicleConfig.wheelColor;
 
-      // Chassis body
       ctx.fillStyle = carColor;
       ctx.strokeStyle = '#0F172A';
       ctx.lineWidth = 3.5;
@@ -966,14 +1018,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.fill();
       ctx.stroke();
 
-      // Cabin / Windshield
       ctx.fillStyle = '#E0F2FE';
       ctx.beginPath();
       ctx.roundRect(-10, -42, 42, 22, 6);
       ctx.fill();
       ctx.stroke();
 
-      // Cute Eyes on windshield!
       ctx.fillStyle = '#0F172A';
       if (state.isBlinking) {
         ctx.lineWidth = 3;
@@ -995,7 +1045,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.fill();
       }
 
-      // Roof siren / chimney
       if (vehicleConfig.roofLight) {
         const sirenColor = Math.floor(now / 150) % 2 === 0 ? '#3B82F6' : '#EF4444';
         ctx.fillStyle = sirenColor;
@@ -1013,7 +1062,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.strokeRect(-22, -46, 7, 24);
       }
 
-      // Headlight
       ctx.fillStyle = '#FDE047';
       ctx.beginPath();
       ctx.arc(38, -10, 6, 0, Math.PI * 2);
@@ -1022,7 +1070,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Wheels
       const drawWheel = (wx: number, wy: number, r: number) => {
         ctx.save();
         ctx.translate(wx, wy);
@@ -1060,9 +1107,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       ctx.restore();
 
-      // ----------------------------------------------------
-      // PARTICLES (Smoke, notes, hearts, stars)
-      // ----------------------------------------------------
+      // Particles
       for (let i = state.particles.length - 1; i >= 0; i--) {
         const p = state.particles[i];
         p.x += p.vx;
@@ -1097,7 +1142,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.restore();
       }
 
-      ctx.restore(); // Restore camera translation
+      ctx.restore();
 
       animationFrameId = requestAnimationFrame(loop);
     };
@@ -1108,7 +1153,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [currentVehicle, currentLevel, isShapePuzzleSolved, isColorPuzzleSolved, lang]);
+  }, [
+    currentVehicle,
+    currentLevel,
+    isShapePuzzleSolved,
+    isColorPuzzleSolved,
+    isLetterPuzzleSolved,
+    isAdditionPuzzleSolved,
+    starsEarned,
+    lang,
+  ]);
 
   return (
     <div className="relative w-full h-full overflow-hidden select-none">

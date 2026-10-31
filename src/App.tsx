@@ -6,6 +6,8 @@ import { TouchControls } from './components/TouchControls';
 import { GameHUD } from './components/GameHUD';
 import { ShapePuzzleModal } from './components/ShapePuzzleModal';
 import { ColorPuzzleModal } from './components/ColorPuzzleModal';
+import { LetterPuzzleModal } from './components/LetterPuzzleModal';
+import { AdditionPuzzleModal } from './components/AdditionPuzzleModal';
 import { VictoryModal } from './components/VictoryModal';
 import { DiplomaModal } from './components/DiplomaModal';
 import { sounds } from './audio/soundEngine';
@@ -38,6 +40,12 @@ export const App: React.FC = () => {
   const [colorPuzzleOpen, setColorPuzzleOpen] = useState<boolean>(false);
   const [requiredColor, setRequiredColor] = useState<'red' | 'blue' | 'yellow' | 'green'>('blue');
   const [isColorPuzzleSolved, setIsColorPuzzleSolved] = useState<boolean>(false);
+
+  const [letterPuzzleOpen, setLetterPuzzleOpen] = useState<boolean>(false);
+  const [isLetterPuzzleSolved, setIsLetterPuzzleSolved] = useState<boolean>(false);
+
+  const [additionPuzzleOpen, setAdditionPuzzleOpen] = useState<boolean>(false);
+  const [isAdditionPuzzleSolved, setIsAdditionPuzzleSolved] = useState<boolean>(false);
 
   const [victoryModalOpen, setVictoryModalOpen] = useState<boolean>(false);
   const [diplomaModalOpen, setDiplomaModalOpen] = useState<boolean>(false);
@@ -74,6 +82,8 @@ export const App: React.FC = () => {
     setCollectedCount(0);
     setIsShapePuzzleSolved(false);
     setIsColorPuzzleSolved(false);
+    setIsLetterPuzzleSolved(false);
+    setIsAdditionPuzzleSolved(false);
 
     const currentIndex = LEVELS.findIndex((l) => l.id === currentLevel.id);
     const nextIndex = (currentIndex + 1) % LEVELS.length;
@@ -86,6 +96,8 @@ export const App: React.FC = () => {
     setCollectedCount(0);
     setIsShapePuzzleSolved(false);
     setIsColorPuzzleSolved(false);
+    setIsLetterPuzzleSolved(false);
+    setIsAdditionPuzzleSolved(false);
     // Trigger reset by re-setting currentLevel object reference
     setCurrentLevel({ ...currentLevel });
   };
@@ -96,6 +108,8 @@ export const App: React.FC = () => {
     setCollectedCount(0);
     setIsShapePuzzleSolved(false);
     setIsColorPuzzleSolved(false);
+    setIsLetterPuzzleSolved(false);
+    setIsAdditionPuzzleSolved(false);
     setVictoryModalOpen(false);
   };
 
@@ -176,6 +190,11 @@ export const App: React.FC = () => {
           setColorPuzzleOpen(true);
         }}
         isColorPuzzleSolved={isColorPuzzleSolved}
+        onRequestLetterPuzzle={() => setLetterPuzzleOpen(true)}
+        isLetterPuzzleSolved={isLetterPuzzleSolved}
+        onRequestAdditionPuzzle={() => setAdditionPuzzleOpen(true)}
+        isAdditionPuzzleSolved={isAdditionPuzzleSolved}
+        starsEarned={starsEarned}
         drivingForward={drivingForward}
         drivingBackward={drivingBackward}
         isJumping={isJumping}
@@ -214,6 +233,26 @@ export const App: React.FC = () => {
         onSolve={() => {
           setIsColorPuzzleSolved(true);
           setColorPuzzleOpen(false);
+        }}
+        lang={lang}
+      />
+
+      {/* Interactive Letter Puzzle Modal */}
+      <LetterPuzzleModal
+        isOpen={letterPuzzleOpen}
+        onSolve={() => {
+          setIsLetterPuzzleSolved(true);
+          setLetterPuzzleOpen(false);
+        }}
+        lang={lang}
+      />
+
+      {/* Interactive Addition Math Puzzle Modal */}
+      <AdditionPuzzleModal
+        isOpen={additionPuzzleOpen}
+        onSolve={() => {
+          setIsAdditionPuzzleSolved(true);
+          setAdditionPuzzleOpen(false);
         }}
         lang={lang}
       />

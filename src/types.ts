@@ -13,7 +13,7 @@ export interface VehicleConfig {
   descriptionSv: string;
 }
 
-export type LevelId = 'apples' | 'shapes' | 'colors' | 'beach';
+export type LevelId = 'apples' | 'shapes' | 'letters' | 'math' | 'colors' | 'beach';
 
 export interface LevelConfig {
   id: LevelId;
@@ -31,10 +31,10 @@ export interface LevelConfig {
     groundFill: string;
   };
   goalCount: number;
-  itemType: 'apple' | 'shapeKey' | 'colorOrb' | 'star';
+  itemType: 'apple' | 'shapeKey' | 'colorOrb' | 'star' | 'letter' | 'number';
   missionDescriptionSv: string;
   missionDescriptionEn: string;
-  friendAnimal: 'horse' | 'dragon' | 'bear' | 'turtle';
+  friendAnimal: 'horse' | 'dragon' | 'bear' | 'turtle' | 'monkey' | 'beaver';
 }
 
 export interface CollectibleItem {
@@ -42,7 +42,7 @@ export interface CollectibleItem {
   x: number;
   y: number;
   collected: boolean;
-  type: 'apple' | 'shapeKey' | 'colorOrb' | 'star';
+  type: 'apple' | 'shapeKey' | 'colorOrb' | 'star' | 'letter' | 'number';
   val?: string | number; // e.g. 1, 2, 3 or 'circle' or 'red'
   color?: string;
   pulsePhase: number;
