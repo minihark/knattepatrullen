@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { VehicleConfig, LevelConfig, VehicleType, CarUpgrades } from './types';
+import { VehicleConfig, LevelConfig, VehicleType, CarUpgrades, TimeOfDay } from './types';
 import { VEHICLES, LEVELS } from './data/gameData';
 import { GameCanvas } from './components/GameCanvas';
 import { TouchControls } from './components/TouchControls';
@@ -93,6 +93,13 @@ export const App: React.FC = () => {
 
   // Settings State
   const [lang, setLang] = useState<'sv' | 'en'>('sv');
+  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>(() => {
+    try {
+      const saved = localStorage.getItem('knatte_time_of_day');
+      if (saved === 'day' || saved === 'night') return saved;
+    } catch {}
+    return 'day';
+  });
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isMusicOn, setIsMusicOn] = useState<boolean>(() => sounds.isMusicOn());
   const [activeHorn, setActiveHorn] = useState<'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog'>(() => {
@@ -104,6 +111,21 @@ export const App: React.FC = () => {
     } catch {}
     return 'horn';
   });
+
+  const handleToggleTimeOfDay = useCallback(() => {
+    sounds.init();
+    const next: TimeOfDay = timeOfDay === 'day' ? 'night' : 'day';
+    setTimeOfDay(next);
+    sounds.playHeadlightSwitch(next === 'night');
+    if (next === 'night') {
+      sounds.playNightModeVoice(lang);
+    } else {
+      sounds.playDayModeVoice(lang);
+    }
+    try {
+      localStorage.setItem('knatte_time_of_day', next);
+    } catch {}
+  }, [timeOfDay, lang]);
 
   const handleToggleMusic = useCallback(() => {
     const next = sounds.toggleMusic();
@@ -251,6 +273,8 @@ export const App: React.FC = () => {
         onOpenDiploma={() => setDiplomaModalOpen(true)}
         lang={lang}
         onToggleLang={() => setLang((prev) => (prev === 'sv' ? 'en' : 'sv'))}
+        timeOfDay={timeOfDay}
+        onToggleTimeOfDay={handleToggleTimeOfDay}
         isMuted={isMuted}
         onToggleMute={() => {
           const next = !isMuted;
@@ -268,6 +292,7 @@ export const App: React.FC = () => {
         currentVehicle={currentVehicle.id}
         currentLevel={currentLevel}
         upgrades={upgrades}
+        timeOfDay={timeOfDay}
         onItemCollected={handleItemCollected}
         onGoalReached={handleGoalReached}
         onRequestShapePuzzle={(shape) => {

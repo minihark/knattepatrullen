@@ -11,7 +11,7 @@ function makeDistortionCurve(amount: number = 15): Float32Array {
   return curve;
 }
 
-function triggerHaptic(durationMs: number = 15) {
+function triggerHaptic(durationMs: number | number[] = 15) {
   if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
     try {
       navigator.vibrate(durationMs);
@@ -698,6 +698,152 @@ class SoundEngine {
         this.playVoiceClip('dog_buster', text, lang);
       }, 300);
     }
+  }
+
+  // ------------------------------------------------------------------
+  // 2.7 NIGHT DRIVING, HEADLIGHT SWITCH & NOCTURNAL ANIMAL SOUNDS
+  // ------------------------------------------------------------------
+  public playHeadlightSwitch(on: boolean) {
+    if (this.isMuted) return;
+    triggerHaptic(25);
+    const ctx = this.getContext();
+    if (!ctx) return;
+    this.init();
+
+    const t = ctx.currentTime;
+
+    // Stage 1: Sharp crisp contact click (800-1400Hz)
+    const clickOsc = ctx.createOscillator();
+    const clickGain = ctx.createGain();
+    clickOsc.type = 'triangle';
+    clickOsc.frequency.setValueAtTime(on ? 1200 : 800, t);
+    clickOsc.frequency.exponentialRampToValueAtTime(on ? 1600 : 600, t + 0.04);
+
+    clickGain.gain.setValueAtTime(0.3, t);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+
+    clickOsc.connect(clickGain);
+    clickGain.connect(ctx.destination);
+    clickOsc.start(t);
+    clickOsc.stop(t + 0.05);
+
+    // Stage 2: Mechanical relay thud
+    const relayOsc = ctx.createOscillator();
+    const relayGain = ctx.createGain();
+    relayOsc.type = 'sine';
+    relayOsc.frequency.setValueAtTime(on ? 320 : 240, t + 0.02);
+    relayOsc.frequency.exponentialRampToValueAtTime(140, t + 0.09);
+
+    relayGain.gain.setValueAtTime(0.25, t + 0.02);
+    relayGain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+
+    relayOsc.connect(relayGain);
+    relayGain.connect(ctx.destination);
+    relayOsc.start(t + 0.02);
+    relayOsc.stop(t + 0.11);
+  }
+
+  public playOwlVoice(lang: 'sv' | 'en' = 'sv') {
+    if (this.isMuted) return;
+    this.playOwlHoot();
+    const fallbackText =
+      lang === 'sv'
+        ? 'Uhuu, uhuu! Hej från ugglan Ulla!'
+        : 'Hoo-hoo, hoo-hoo! Hello from Ulla the Owl!';
+    setTimeout(() => {
+      this.playVoiceClip('owl_ulla', fallbackText, lang);
+    }, 450);
+  }
+
+  public playOwlHoot() {
+    if (this.isMuted) return;
+    triggerHaptic([15, 60, 20]);
+    const ctx = this.getContext();
+    if (!ctx) return;
+    this.init();
+
+    const t = ctx.currentTime;
+
+    // Two-tone friendly hoot: "Uhuu... uhuu!"
+    [
+      { start: t, freq1: 520, freq2: 660, freq3: 540, dur: 0.32 },
+      { start: t + 0.42, freq1: 500, freq2: 640, freq3: 510, dur: 0.38 },
+    ].forEach((tone) => {
+      const osc = ctx.createOscillator();
+      const sub = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      osc.type = 'sine';
+      sub.type = 'triangle';
+
+      osc.frequency.setValueAtTime(tone.freq1, tone.start);
+      osc.frequency.exponentialRampToValueAtTime(tone.freq2, tone.start + tone.dur * 0.4);
+      osc.frequency.exponentialRampToValueAtTime(tone.freq3, tone.start + tone.dur);
+
+      sub.frequency.setValueAtTime(tone.freq1 * 0.5, tone.start);
+      sub.frequency.exponentialRampToValueAtTime(tone.freq2 * 0.5, tone.start + tone.dur * 0.4);
+      sub.frequency.exponentialRampToValueAtTime(tone.freq3 * 0.5, tone.start + tone.dur);
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1100, tone.start);
+
+      gain.gain.setValueAtTime(0.001, tone.start);
+      gain.gain.linearRampToValueAtTime(0.28, tone.start + 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.001, tone.start + tone.dur);
+
+      osc.connect(filter);
+      sub.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(tone.start);
+      sub.start(tone.start);
+      osc.stop(tone.start + tone.dur + 0.02);
+      sub.stop(tone.start + tone.dur + 0.02);
+    });
+  }
+
+  public playNightCricket() {
+    if (this.isMuted) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+    this.init();
+
+    const t = ctx.currentTime;
+    [0, 0.06, 0.12].forEach((offset) => {
+      const st = t + offset;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(4400, st);
+
+      gain.gain.setValueAtTime(0.035, st);
+      gain.gain.exponentialRampToValueAtTime(0.001, st + 0.035);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(st);
+      osc.stop(st + 0.04);
+    });
+  }
+
+  public playNightModeVoice(lang: 'sv' | 'en' = 'sv') {
+    const fallbackText =
+      lang === 'sv'
+        ? 'Nattkörning! Tänd strålkastarna!'
+        : 'Night driving! Headlights on!';
+    this.playVoiceClip('night_mode', fallbackText, lang);
+  }
+
+  public playDayModeVoice(lang: 'sv' | 'en' = 'sv') {
+    const fallbackText =
+      lang === 'sv'
+        ? 'God morgon! Solen skiner!'
+        : 'Good morning! The sun is shining!';
+    this.playVoiceClip('day_mode', fallbackText, lang);
   }
 
   public playSnap() {

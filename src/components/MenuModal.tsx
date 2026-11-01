@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { VehicleConfig, LevelConfig, CarUpgrades } from '../types';
+import { VehicleConfig, LevelConfig, CarUpgrades, TimeOfDay } from '../types';
 import { VEHICLES, LEVELS, UPGRADES_CONFIG } from '../data/gameData';
 import { sounds } from '../audio/soundEngine';
 import confetti from 'canvas-confetti';
-import { X, Volume2, VolumeX, Award, Play, Sparkles, Zap, Shield, ChevronRight, Music } from 'lucide-react';
+import { X, Volume2, VolumeX, Award, Play, Sparkles, Zap, Shield, ChevronRight, Music, Moon, Sun } from 'lucide-react';
 
 interface MenuModalProps {
   isOpen: boolean;
@@ -22,6 +22,8 @@ interface MenuModalProps {
   onToggleMute: () => void;
   isMusicOn: boolean;
   onToggleMusic: () => void;
+  timeOfDay?: TimeOfDay;
+  onToggleTimeOfDay?: () => void;
   activeHorn: 'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog';
   onSelectHorn: (h: 'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog') => void;
   initialTab?: 'levels' | 'garage' | 'settings';
@@ -44,6 +46,8 @@ export const MenuModal: React.FC<MenuModalProps> = ({
   onToggleMute,
   isMusicOn,
   onToggleMusic,
+  timeOfDay = 'day',
+  onToggleTimeOfDay,
   activeHorn,
   onSelectHorn,
   initialTab = 'levels',
@@ -538,6 +542,42 @@ export const MenuModal: React.FC<MenuModalProps> = ({
                   }`}
                 >
                   {isMusicOn && !isMuted ? (lang === 'sv' ? 'Musik På' : 'Music On') : (lang === 'sv' ? 'Musik Av' : 'Music Off')}
+                </button>
+              </div>
+
+              {/* Day / Night Starry Adventure Mode */}
+              <div className="p-4 rounded-2xl bg-white border-2 border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${
+                    timeOfDay === 'night' ? 'bg-indigo-950 text-amber-300' : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {timeOfDay === 'night' ? '🌙' : '☀️'}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-sm">
+                      {lang === 'sv' ? 'Dag eller Nattkörning' : 'Day or Night Driving'}
+                    </h4>
+                    <p className="text-xs text-slate-500">
+                      {timeOfDay === 'night'
+                        ? (lang === 'sv' ? 'Stjärnhimmel, strålkastare & ugglan Ulla' : 'Starry sky, headlights & Ulla the Owl')
+                        : (lang === 'sv' ? 'Solsken och klarblå himmel' : 'Sunshine and clear blue sky')}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.init();
+                    onToggleTimeOfDay?.();
+                  }}
+                  className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${
+                    timeOfDay === 'night'
+                      ? 'bg-indigo-900 text-amber-300 shadow-sm'
+                      : 'bg-amber-500 text-white shadow-sm'
+                  }`}
+                >
+                  {timeOfDay === 'night' ? (lang === 'sv' ? '🌙 Natt' : '🌙 Night') : (lang === 'sv' ? '☀️ Dag' : '☀️ Day')}
                 </button>
               </div>
 

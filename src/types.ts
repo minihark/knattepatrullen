@@ -1,4 +1,5 @@
 export type VehicleType = 'fire' | 'tractor' | 'rocket' | 'rescue';
+export type TimeOfDay = 'day' | 'night';
 
 export interface VehicleTraits {
   maxSpeed: number;

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { VehicleType, LevelConfig, CollectibleItem, Particle, CarUpgrades } from '../types';
+import { VehicleType, LevelConfig, CollectibleItem, Particle, CarUpgrades, TimeOfDay } from '../types';
 import { VEHICLES } from '../data/gameData';
 import { sounds } from '../audio/soundEngine';
 
@@ -23,6 +23,7 @@ interface GameCanvasProps {
   isJumping: boolean;
   hornTrigger: number;
   activeHorn?: 'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog';
+  timeOfDay?: TimeOfDay;
   lang: 'sv' | 'en';
 }
 
@@ -40,7 +41,7 @@ interface AnimalProp {
   x: number;
   emoji: string;
   name: string;
-  type?: 'cat' | 'dog' | 'cow' | 'sheep' | 'rabbit' | 'squirrel';
+  type?: 'cat' | 'dog' | 'cow' | 'sheep' | 'rabbit' | 'squirrel' | 'owl';
   jumpY: number;
   jumpVy: number;
   greeted?: boolean;
@@ -77,6 +78,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   isJumping,
   hornTrigger,
   activeHorn,
+  timeOfDay = 'day',
   lang,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -131,8 +133,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     animals: [
       { x: 950, emoji: '🐱', name: 'Katten Misse', jumpY: 0, jumpVy: 0, type: 'cat', greeted: false },
+      { x: 1450, emoji: '🦉', name: 'Ugglan Ulla', jumpY: 0, jumpVy: 0, type: 'owl', greeted: false },
       { x: 1900, emoji: '🐶', name: 'Hunden Buster', jumpY: 0, jumpVy: 0, type: 'dog', greeted: false },
       { x: 3100, emoji: '🐮', name: 'Klara Ko', jumpY: 0, jumpVy: 0, type: 'cow', greeted: false },
+      { x: 3850, emoji: '🦉', name: 'Ugglan Ulla', jumpY: 0, jumpVy: 0, type: 'owl', greeted: false },
       { x: 4400, emoji: '🐰', name: 'Pelle Kanin', jumpY: 0, jumpVy: 0, type: 'rabbit', greeted: false },
       { x: 5600, emoji: '🐿️', name: 'Nils Ekorre', jumpY: 0, jumpVy: 0, type: 'squirrel', greeted: false },
     ] as AnimalProp[],
@@ -713,6 +717,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             sounds.playAnimalVoice('cat', lang);
           } else if (animal.type === 'dog') {
             sounds.playAnimalVoice('dog', lang);
+          } else if (animal.type === 'owl') {
+            sounds.playOwlVoice(lang);
           }
         }
       });
@@ -869,23 +875,122 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       // ----------------------------------------------------
       ctx.clearRect(0, 0, viewW, viewH);
 
-      // Sky Gradient
+      // Sky Gradient (Day vs Night)
       const skyGrad = ctx.createLinearGradient(0, 0, 0, viewH);
-      skyGrad.addColorStop(0, currentLevel.theme.skyTop);
-      skyGrad.addColorStop(1, currentLevel.theme.skyBottom);
+      if (timeOfDay === 'night') {
+        skyGrad.addColorStop(0, '#050816');
+        skyGrad.addColorStop(0.42, '#0C122B');
+        skyGrad.addColorStop(1, '#161D3D');
+      } else {
+        skyGrad.addColorStop(0, currentLevel.theme.skyTop);
+        skyGrad.addColorStop(1, currentLevel.theme.skyBottom);
+      }
       ctx.fillStyle = skyGrad;
       ctx.fillRect(0, 0, viewW, viewH);
 
-      // Warm Sun Rays
-      ctx.save();
-      ctx.fillStyle = '#FEF08A';
-      ctx.beginPath();
-      ctx.arc(viewW - 90, 80, 44, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#FDE047';
-      ctx.lineWidth = 6;
-      ctx.stroke();
-      ctx.restore();
+      if (timeOfDay === 'night') {
+        // ----------------------------------------------------
+        // STARRY NIGHT SKY: TWINKLING STARS & SHOOTING STARS
+        // ----------------------------------------------------
+        ctx.save();
+        for (let i = 0; i < 55; i++) {
+          const starX = ((i * 137.5 + 40) % (viewW + 200)) - ((state.camX * 0.03) % (viewW + 200));
+          const drawStarX = ((starX % (viewW + 200)) + (viewW + 200)) % (viewW + 200) - 50;
+          const starY = (i * 47.3) % (viewH * 0.46);
+          const twinkle = 0.35 + 0.65 * Math.sin(now * 0.003 + i * 2.1);
+          const starR = (i % 3 === 0 ? 2.5 : 1.5) * (0.8 + 0.3 * Math.sin(now * 0.004 + i));
+
+          ctx.fillStyle = `rgba(254, 240, 138, ${Math.max(0.12, twinkle)})`;
+          ctx.beginPath();
+          ctx.arc(drawStarX, starY, starR, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Subtle cross sparkle on brighter stars
+          if (i % 5 === 0 && twinkle > 0.72) {
+            ctx.strokeStyle = `rgba(255, 255, 255, ${(twinkle - 0.72) * 2.2})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(drawStarX - 4, starY);
+            ctx.lineTo(drawStarX + 4, starY);
+            ctx.moveTo(drawStarX, starY - 4);
+            ctx.lineTo(drawStarX, starY + 4);
+            ctx.stroke();
+          }
+        }
+
+        // Occasional shooting star across the midnight sky
+        const shootCycle = (now * 0.00035) % 1;
+        if (shootCycle < 0.22) {
+          const shootProgress = shootCycle / 0.22;
+          const sx = viewW * 0.82 - shootProgress * (viewW * 0.55);
+          const sy = 35 + shootProgress * 110;
+          const shootGrad = ctx.createLinearGradient(sx + 50, sy - 25, sx, sy);
+          shootGrad.addColorStop(0, 'rgba(254, 240, 138, 0)');
+          shootGrad.addColorStop(1, 'rgba(255, 255, 255, 0.9)');
+
+          ctx.strokeStyle = shootGrad;
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(sx + 45, sy - 22);
+          ctx.lineTo(sx, sy);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        // ----------------------------------------------------
+        // GLOWING SMILING CRESCENT MOON
+        // ----------------------------------------------------
+        ctx.save();
+        const moonX = viewW - 95;
+        const moonY = 85;
+
+        // Outer Lunar Glow Aura
+        const moonAura = ctx.createRadialGradient(moonX, moonY, 15, moonX, moonY, 78);
+        moonAura.addColorStop(0, 'rgba(254, 240, 138, 0.42)');
+        moonAura.addColorStop(0.5, 'rgba(254, 240, 138, 0.12)');
+        moonAura.addColorStop(1, 'rgba(254, 240, 138, 0)');
+        ctx.fillStyle = moonAura;
+        ctx.beginPath();
+        ctx.arc(moonX, moonY, 78, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Moon Crescent
+        ctx.fillStyle = '#FEF08A';
+        ctx.beginPath();
+        ctx.arc(moonX, moonY, 36, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Dark sky cutout to form crescent
+        ctx.fillStyle = '#050816';
+        ctx.beginPath();
+        ctx.arc(moonX + 16, moonY - 6, 32, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Cute smiling eye on crescent moon
+        ctx.fillStyle = '#1E293B';
+        ctx.beginPath();
+        ctx.arc(moonX - 8, moonY - 4, 3, 0, Math.PI * 2);
+        ctx.fill();
+        // Little happy smile
+        ctx.strokeStyle = '#1E293B';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(moonX - 8, moonY + 6, 7, 0.2 * Math.PI, 0.8 * Math.PI);
+        ctx.stroke();
+
+        ctx.restore();
+      } else {
+        // Warm Sun Rays (Day Mode)
+        ctx.save();
+        ctx.fillStyle = '#FEF08A';
+        ctx.beginPath();
+        ctx.arc(viewW - 90, 80, 44, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#FDE047';
+        ctx.lineWidth = 6;
+        ctx.stroke();
+        ctx.restore();
+      }
 
       // Fluffy Clouds
       const cloudOffset = state.camX * 0.16;
@@ -906,7 +1011,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         const renderX = c.x - cloudOffset;
         if (renderX > -150 && renderX < viewW + 150) {
           ctx.save();
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+          ctx.fillStyle = timeOfDay === 'night' ? 'rgba(30, 41, 59, 0.72)' : 'rgba(255, 255, 255, 0.88)';
           ctx.beginPath();
           ctx.arc(renderX, c.y, 28 * c.s, 0, Math.PI * 2);
           ctx.arc(renderX + 22 * c.s, c.y - 10 * c.s, 24 * c.s, 0, Math.PI * 2);
@@ -944,7 +1049,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         const peakX = p.x + p.w / 2;
         const peakY = mtnBaseY - p.h;
         // Mountain base
-        ctx.fillStyle = '#94A3B8';
+        ctx.fillStyle = timeOfDay === 'night' ? '#0F172A' : '#94A3B8';
         ctx.beginPath();
         ctx.moveTo(p.x, mtnBaseY);
         ctx.lineTo(peakX, peakY);
@@ -954,7 +1059,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
         // Snow Cap
         const snowH = p.h * 0.32;
-        ctx.fillStyle = '#F8FAFC';
+        ctx.fillStyle = timeOfDay === 'night' ? '#334155' : '#F8FAFC';
         ctx.beginPath();
         ctx.moveTo(peakX, peakY);
         ctx.lineTo(peakX + p.w * 0.16, peakY + snowH);
@@ -969,7 +1074,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       // 2. Midground Rolling Pine Forest & Swedish Red Cottages (0.22x Parallax)
       ctx.save();
       ctx.translate(-state.camX * 0.22, -state.camY * 0.12);
-      ctx.fillStyle = '#86EFAC';
+      ctx.fillStyle = timeOfDay === 'night' ? '#064E3B' : '#86EFAC';
       ctx.beginPath();
       ctx.moveTo(-200, viewH + 200);
       for (let x = -200; x < 7500; x += 60) {
@@ -1046,7 +1151,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       // 3. Near Rolling Hills (0.4x Parallax)
       ctx.save();
       ctx.translate(-state.camX * 0.4, -state.camY * 0.2);
-      ctx.fillStyle = '#4ADE80';
+      ctx.fillStyle = timeOfDay === 'night' ? '#043628' : '#4ADE80';
       ctx.beginPath();
       ctx.moveTo(-200, viewH + 200);
       for (let x = -200; x < 7500; x += 70) {
@@ -1076,12 +1181,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.lineTo(endX, deepBottom);
       ctx.closePath();
 
-      ctx.fillStyle = currentLevel.theme.grassFill;
+      ctx.fillStyle = timeOfDay === 'night' ? '#0B1528' : currentLevel.theme.grassFill;
       ctx.fill();
 
       // Subsurface earthy strata band
       ctx.save();
-      ctx.fillStyle = currentLevel.theme.groundFill || '#78350F';
+      ctx.fillStyle = timeOfDay === 'night' ? '#060B14' : (currentLevel.theme.groundFill || '#78350F');
       ctx.beginPath();
       ctx.moveTo(startX, deepBottom);
       for (let x = startX; x <= endX; x += 15) {
@@ -1301,11 +1406,64 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         const ay = getGroundY(animal.x, viewH);
         ctx.save();
         ctx.translate(animal.x, ay - 32 + animal.jumpY);
+
+        if (animal.type === 'owl') {
+          // Draw cute wooden fence post / perch
+          ctx.fillStyle = '#78350F';
+          ctx.strokeStyle = '#451A03';
+          ctx.lineWidth = 2;
+          ctx.fillRect(-10, 8, 20, 28);
+          ctx.strokeRect(-10, 8, 20, 28);
+
+          // Horizontal branch perch
+          ctx.fillRect(-22, 6, 44, 7);
+          ctx.strokeRect(-22, 6, 44, 7);
+
+          // In night mode, give owl's eyes subtle golden twinkle or glow behind
+          if (timeOfDay === 'night') {
+            const eyeGlow = 0.5 + Math.sin(now * 0.005) * 0.3;
+            ctx.fillStyle = `rgba(253, 224, 71, ${eyeGlow * 0.4})`;
+            ctx.beginPath();
+            ctx.arc(0, -14, 18, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
         ctx.font = '52px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(animal.emoji, 0, 0);
         ctx.restore();
       });
+
+      // Night Fireflies (Eldflugor & Lysmaskar)
+      if (timeOfDay === 'night') {
+        const fireflyCount = 28;
+        for (let f = 0; f < fireflyCount; f++) {
+          const fWorldX = (state.camX - 200) + ((f * 140) % (viewW + 400));
+          const fGroundY = getGroundY(fWorldX, viewH);
+          const fHeightOffset = -30 - ((f * 37) % 110) + Math.sin(now * 0.0022 + f * 1.7) * 18;
+          const fY = fGroundY + fHeightOffset;
+          const pulse = 0.3 + 0.7 * Math.max(0, Math.sin(now * 0.003 + f * 2.1));
+
+          // Soft green/yellow glowing orb
+          ctx.save();
+          const auraGrad = ctx.createRadialGradient(fWorldX, fY, 1, fWorldX, fY, 12);
+          auraGrad.addColorStop(0, `rgba(217, 249, 157, ${pulse * 0.85})`);
+          auraGrad.addColorStop(0.5, `rgba(163, 230, 53, ${pulse * 0.35})`);
+          auraGrad.addColorStop(1, 'rgba(163, 230, 53, 0)');
+          ctx.fillStyle = auraGrad;
+          ctx.beginPath();
+          ctx.arc(fWorldX, fY, 12, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Bright center core
+          ctx.fillStyle = '#FEF08A';
+          ctx.beginPath();
+          ctx.arc(fWorldX, fY, 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
 
       // Mini Bonus Stars
       state.bonusItems.forEach((b) => {
@@ -1647,7 +1805,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       }
 
       // Headlight & Dynamic Lighting Beam
-      ctx.fillStyle = '#FDE047';
+      const isNight = timeOfDay === 'night';
+      ctx.fillStyle = isNight ? '#FEF08A' : '#FDE047';
       ctx.beginPath();
       ctx.arc(38, -10, 6, 0, Math.PI * 2);
       ctx.fill();
@@ -1655,20 +1814,47 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Dynamic Headlight Glow Beam shining forward onto track
+      // Headlight lens flare / aura
       ctx.save();
-      const beamGrad = ctx.createRadialGradient(38, -10, 6, 180, 10, 160);
-      beamGrad.addColorStop(0, 'rgba(254, 240, 138, 0.42)');
-      beamGrad.addColorStop(0.4, 'rgba(254, 240, 138, 0.14)');
+      const flareRadius = isNight ? 26 : 14;
+      const flareGrad = ctx.createRadialGradient(38, -10, 2, 38, -10, flareRadius);
+      flareGrad.addColorStop(0, isNight ? 'rgba(255, 255, 255, 0.95)' : 'rgba(254, 240, 138, 0.6)');
+      flareGrad.addColorStop(0.4, isNight ? 'rgba(254, 240, 138, 0.7)' : 'rgba(254, 240, 138, 0.25)');
+      flareGrad.addColorStop(1, 'rgba(254, 240, 138, 0)');
+      ctx.fillStyle = flareGrad;
+      ctx.beginPath();
+      ctx.arc(38, -10, flareRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Volumetric Headlight Cone shining forward onto track
+      const beamReach = isNight ? 340 : 210;
+      const beamHeightTop = isNight ? -50 : -32;
+      const beamHeightBottom = isNight ? 68 : 48;
+      const beamGrad = ctx.createRadialGradient(38, -10, 6, 200, 10, beamReach);
+      beamGrad.addColorStop(0, isNight ? 'rgba(255, 255, 230, 0.72)' : 'rgba(254, 240, 138, 0.42)');
+      beamGrad.addColorStop(0.35, isNight ? 'rgba(254, 240, 138, 0.32)' : 'rgba(254, 240, 138, 0.14)');
+      beamGrad.addColorStop(0.7, isNight ? 'rgba(254, 240, 138, 0.12)' : 'rgba(254, 240, 138, 0.04)');
       beamGrad.addColorStop(1, 'rgba(254, 240, 138, 0)');
       ctx.fillStyle = beamGrad;
       ctx.beginPath();
       ctx.moveTo(38, -12);
-      ctx.lineTo(210, -32);
-      ctx.lineTo(230, 48);
+      ctx.lineTo(beamReach, beamHeightTop);
+      ctx.lineTo(beamReach + 20, beamHeightBottom);
       ctx.lineTo(38, -4);
       ctx.closePath();
       ctx.fill();
+
+      // In night mode: bright elliptical road spotlight ahead of the car
+      if (isNight) {
+        const spotGrad = ctx.createRadialGradient(180, 24, 8, 180, 24, 90);
+        spotGrad.addColorStop(0, 'rgba(254, 240, 138, 0.38)');
+        spotGrad.addColorStop(0.6, 'rgba(254, 240, 138, 0.14)');
+        spotGrad.addColorStop(1, 'rgba(254, 240, 138, 0)');
+        ctx.fillStyle = spotGrad;
+        ctx.beginPath();
+        ctx.ellipse(180, 24, 90, 28, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.restore();
 
       // Suspension Springs Upgrade (suspensionLevel >= 2)
@@ -1817,6 +2003,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     isAdditionPuzzleSolved,
     starsEarned,
     lang,
+    timeOfDay,
   ]);
 
   return (

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { VehicleConfig, LevelConfig, CarUpgrades } from '../types';
+import { VehicleConfig, LevelConfig, CarUpgrades, TimeOfDay } from '../types';
 import { MenuModal } from './MenuModal';
 import { Compass, Volume2, VolumeX, Music } from 'lucide-react';
 import { sounds } from '../audio/soundEngine';
@@ -20,6 +20,8 @@ interface GameHUDProps {
   onToggleMute: () => void;
   isMusicOn: boolean;
   onToggleMusic: () => void;
+  timeOfDay: TimeOfDay;
+  onToggleTimeOfDay: () => void;
   activeHorn: 'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog';
   onSelectHorn: (h: 'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog') => void;
 }
@@ -40,6 +42,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   onToggleMute,
   isMusicOn,
   onToggleMusic,
+  timeOfDay,
+  onToggleTimeOfDay,
   activeHorn,
   onSelectHorn,
 }) => {
@@ -101,6 +105,27 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             {isMusicOn && !isMuted && <span className="text-[10px]">🎵</span>}
           </button>
 
+          {/* Day / Night Starry Adventure Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              sounds.init();
+              onToggleTimeOfDay();
+            }}
+            aria-label={timeOfDay === 'day' ? 'Växla till nattkörning' : 'Växla till dagkörning'}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-2xl border-2 shadow-md active:scale-95 transition-all text-xs font-extrabold ${
+              timeOfDay === 'night'
+                ? 'bg-slate-900/95 border-indigo-400 text-amber-300'
+                : 'bg-amber-50/95 border-amber-300 text-amber-900'
+            }`}
+            title={timeOfDay === 'night' ? 'Nattkörning med strålkastare' : 'Dagkörning med solsken'}
+          >
+            <span className="text-sm sm:text-base leading-none">{timeOfDay === 'night' ? '🌙' : '☀️'}</span>
+            <span className="hidden md:inline font-display text-xs">
+              {timeOfDay === 'night' ? (lang === 'sv' ? 'Natt' : 'Night') : (lang === 'sv' ? 'Dag' : 'Day')}
+            </span>
+          </button>
+
           {/* Quick Vehicle / Garage Button */}
           <button
             type="button"
@@ -158,6 +183,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         onToggleMute={onToggleMute}
         isMusicOn={isMusicOn}
         onToggleMusic={onToggleMusic}
+        timeOfDay={timeOfDay}
+        onToggleTimeOfDay={onToggleTimeOfDay}
         activeHorn={activeHorn}
         onSelectHorn={onSelectHorn}
         initialTab={initialMenuTab}
