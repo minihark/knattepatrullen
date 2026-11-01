@@ -94,6 +94,47 @@ export const App: React.FC = () => {
   // Settings State
   const [lang, setLang] = useState<'sv' | 'en'>('sv');
   const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [isMusicOn, setIsMusicOn] = useState<boolean>(() => sounds.isMusicOn());
+  const [activeHorn, setActiveHorn] = useState<'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog'>(() => {
+    try {
+      const saved = localStorage.getItem('knatte_active_horn');
+      if (saved && ['horn', 'quack', 'siren', 'boing', 'cat', 'dog'].includes(saved)) {
+        return saved as any;
+      }
+    } catch {}
+    return 'horn';
+  });
+
+  const handleToggleMusic = useCallback(() => {
+    const next = sounds.toggleMusic();
+    setIsMusicOn(next);
+  }, []);
+
+  const handleSelectHorn = useCallback((h: 'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog') => {
+    setActiveHorn(h);
+    try {
+      localStorage.setItem('knatte_active_horn', h);
+    } catch {}
+  }, []);
+
+  const handleCycleHorn = useCallback(() => {
+    sounds.init();
+    const horns: ('horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog')[] = [
+      'horn',
+      'quack',
+      'siren',
+      'boing',
+      'cat',
+      'dog',
+    ];
+    const currentIndex = horns.indexOf(activeHorn);
+    const nextHorn = horns[(currentIndex + 1) % horns.length];
+    setActiveHorn(nextHorn);
+    sounds.playHorn(nextHorn);
+    try {
+      localStorage.setItem('knatte_active_horn', nextHorn);
+    } catch {}
+  }, [activeHorn]);
 
   // Add stars helper
   const addStars = useCallback((num: number = 3) => {
@@ -157,8 +198,9 @@ export const App: React.FC = () => {
   // Honk Horn
   const triggerHonk = useCallback(() => {
     sounds.init();
+    sounds.playHorn(activeHorn);
     setHornTrigger((prev) => prev + 1);
-  }, []);
+  }, [activeHorn]);
 
   // Keyboard Event Listeners for Desktop Play
   useEffect(() => {
@@ -215,6 +257,10 @@ export const App: React.FC = () => {
           setIsMuted(next);
           sounds.setMuted(next);
         }}
+        isMusicOn={isMusicOn}
+        onToggleMusic={handleToggleMusic}
+        activeHorn={activeHorn}
+        onSelectHorn={handleSelectHorn}
       />
 
       {/* Main 60fps Canvas Simulator */}
@@ -243,12 +289,15 @@ export const App: React.FC = () => {
         drivingBackward={drivingBackward}
         isJumping={isJumping}
         hornTrigger={hornTrigger}
+        activeHorn={activeHorn}
         lang={lang}
       />
 
       {/* Big Thumb Touch Controls (Bottom left drive, bottom right jump & honk) */}
       <TouchControls
         vehicle={currentVehicle}
+        activeHorn={activeHorn}
+        onCycleHorn={handleCycleHorn}
         onDriveForwardStart={() => setDrivingForward(true)}
         onDriveForwardEnd={() => setDrivingForward(false)}
         onDriveBackwardStart={() => setDrivingBackward(true)}

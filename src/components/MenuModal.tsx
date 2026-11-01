@@ -3,7 +3,7 @@ import { VehicleConfig, LevelConfig, CarUpgrades } from '../types';
 import { VEHICLES, LEVELS, UPGRADES_CONFIG } from '../data/gameData';
 import { sounds } from '../audio/soundEngine';
 import confetti from 'canvas-confetti';
-import { X, Volume2, VolumeX, Award, Play, Sparkles, Zap, Shield, ChevronRight } from 'lucide-react';
+import { X, Volume2, VolumeX, Award, Play, Sparkles, Zap, Shield, ChevronRight, Music } from 'lucide-react';
 
 interface MenuModalProps {
   isOpen: boolean;
@@ -20,6 +20,10 @@ interface MenuModalProps {
   onToggleLang: () => void;
   isMuted: boolean;
   onToggleMute: () => void;
+  isMusicOn: boolean;
+  onToggleMusic: () => void;
+  activeHorn: 'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog';
+  onSelectHorn: (h: 'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog') => void;
   initialTab?: 'levels' | 'garage' | 'settings';
 }
 
@@ -38,6 +42,10 @@ export const MenuModal: React.FC<MenuModalProps> = ({
   onToggleLang,
   isMuted,
   onToggleMute,
+  isMusicOn,
+  onToggleMusic,
+  activeHorn,
+  onSelectHorn,
   initialTab = 'levels',
 }) => {
   const [activeTab, setActiveTab] = useState<'levels' | 'garage' | 'settings'>(initialTab);
@@ -465,6 +473,7 @@ export const MenuModal: React.FC<MenuModalProps> = ({
                 <Award className="w-6 h-6 text-amber-700" />
               </button>
 
+              {/* Sound Effects & Engine Rumble Toggle */}
               <div className="p-4 rounded-2xl bg-white border-2 border-slate-200 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
@@ -472,19 +481,22 @@ export const MenuModal: React.FC<MenuModalProps> = ({
                   </div>
                   <div>
                     <h4 className="font-bold text-slate-800 text-sm">
-                      {lang === 'sv' ? 'Ljudeffekter & Tuta' : 'Sound Effects & Horn'}
+                      {lang === 'sv' ? 'Ljudeffekter & Motorljud' : 'Sound Effects & Motor Rumble'}
                     </h4>
                     <p className="text-xs text-slate-500">
                       {isMuted
-                        ? lang === 'sv' ? 'Ljudet är avstängt' : 'Sound is muted'
-                        : lang === 'sv' ? 'Ljudet är på' : 'Sound is on'}
+                        ? lang === 'sv' ? 'Alla ljudeffekter är avstängda' : 'Sound effects are muted'
+                        : lang === 'sv' ? 'Taktilt motorbrum & effekter igång' : 'Tactile engine rumble & SFX on'}
                     </p>
                   </div>
                 </div>
 
                 <button
                   type="button"
-                  onClick={onToggleMute}
+                  onClick={() => {
+                    sounds.init();
+                    onToggleMute();
+                  }}
                   className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${
                     isMuted
                       ? 'bg-slate-200 text-slate-700'
@@ -493,6 +505,143 @@ export const MenuModal: React.FC<MenuModalProps> = ({
                 >
                   {isMuted ? (lang === 'sv' ? 'Sätt på' : 'Turn On') : (lang === 'sv' ? 'Ljud På' : 'Sound On')}
                 </button>
+              </div>
+
+              {/* Background Playful Melody Chime Toggle */}
+              <div className="p-4 rounded-2xl bg-white border-2 border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-700">
+                    <Music className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-sm">
+                      {lang === 'sv' ? 'Bakgrundsmusik & Trudilutt' : 'Background Playful Melody'}
+                    </h4>
+                    <p className="text-xs text-slate-500">
+                      {isMusicOn && !isMuted
+                        ? lang === 'sv' ? 'Glad pentatonisk klockmelodi igång' : 'Cheerful pentatonic chime loop playing'
+                        : lang === 'sv' ? 'Bakgrundsmusik avstängd' : 'Background music off'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.init();
+                    onToggleMusic();
+                  }}
+                  className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${
+                    isMusicOn && !isMuted
+                      ? 'bg-amber-500 text-white shadow-sm'
+                      : 'bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  {isMusicOn && !isMuted ? (lang === 'sv' ? 'Musik På' : 'Music On') : (lang === 'sv' ? 'Musik Av' : 'Music Off')}
+                </button>
+              </div>
+
+              {/* Select Horn Sound (6 Kid-Friendly Horns) */}
+              <div className="p-4 rounded-2xl bg-amber-50/70 border-2 border-amber-200 flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-extrabold text-amber-950 text-sm flex items-center gap-1.5">
+                    <span>📯</span>
+                    <span>{lang === 'sv' ? 'Välj din favorittuta!' : 'Pick your favorite horn!'}</span>
+                  </h4>
+                  <span className="text-[11px] text-amber-800 font-medium">
+                    {lang === 'sv' ? 'Tryck för att provtuta' : 'Tap to try sound'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'horn', nameSv: 'Klassisk', nameEn: 'Classic', emoji: '📢' },
+                    { id: 'quack', nameSv: 'Kvack-Anka', nameEn: 'Duck', emoji: '🦆' },
+                    { id: 'siren', nameSv: 'Brandbil', nameEn: 'Siren', emoji: '🚨' },
+                    { id: 'boing', nameSv: 'Rymd-Boing', nameEn: 'Space Boing', emoji: '⭐' },
+                    { id: 'cat', nameSv: 'Katten Misse', nameEn: 'Misse Cat', emoji: '🐱' },
+                    { id: 'dog', nameSv: 'Hunden Buster', nameEn: 'Buster Dog', emoji: '🐶' },
+                  ].map((hornItem) => {
+                    const isSelected = activeHorn === hornItem.id;
+                    return (
+                      <button
+                        key={hornItem.id}
+                        type="button"
+                        onClick={() => {
+                          sounds.init();
+                          sounds.playHorn(hornItem.id as any);
+                          onSelectHorn(hornItem.id as any);
+                        }}
+                        className={`p-2.5 rounded-xl border-2 flex flex-col items-center justify-center gap-1 active:scale-95 transition-all text-xs font-black ${
+                          isSelected
+                            ? 'bg-amber-400 border-amber-600 text-amber-950 ring-2 ring-amber-300 shadow-sm'
+                            : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-800'
+                        }`}
+                      >
+                        <span className="text-2xl leading-none">{hornItem.emoji}</span>
+                        <span className="text-[11px] font-bold truncate">
+                          {lang === 'sv' ? hornItem.nameSv : hornItem.nameEn}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Animal Friends Voice Showcase (Katten Misse & Hunden Buster) */}
+              <div className="p-4 rounded-2xl bg-white border-2 border-slate-200 flex flex-col gap-2.5">
+                <h4 className="font-extrabold text-slate-800 text-sm flex items-center gap-1.5">
+                  <span>🐾</span>
+                  <span>{lang === 'sv' ? 'Djur-Vännerna i Knattepatrullen' : 'Animal Friends'}</span>
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {/* Katten Misse */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.init();
+                      sounds.playAnimalVoice('cat', lang);
+                    }}
+                    className="p-3 rounded-xl bg-orange-50 hover:bg-orange-100/80 active:scale-98 border-2 border-orange-200 text-left flex items-center gap-3 transition-all"
+                  >
+                    <span className="text-3xl p-1 bg-white rounded-lg shadow-xs">🐱</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-black text-orange-950 text-xs">
+                        {lang === 'sv' ? 'Katten Misse' : 'Misse the Cat'}
+                      </div>
+                      <div className="text-[11px] text-orange-800 font-medium">
+                        {lang === 'sv' ? '”Mjau! Ska vi rejsa?”' : '"Meow! Shall we race?"'}
+                      </div>
+                    </div>
+                    <span className="text-xs bg-orange-200 text-orange-900 font-black px-2 py-1 rounded-lg">
+                      🔊
+                    </span>
+                  </button>
+
+                  {/* Hunden Buster */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.init();
+                      sounds.playAnimalVoice('dog', lang);
+                    }}
+                    className="p-3 rounded-xl bg-amber-50 hover:bg-amber-100/80 active:scale-98 border-2 border-amber-200 text-left flex items-center gap-3 transition-all"
+                  >
+                    <span className="text-3xl p-1 bg-white rounded-lg shadow-xs">🐶</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-black text-amber-950 text-xs">
+                        {lang === 'sv' ? 'Hunden Buster' : 'Buster the Dog'}
+                      </div>
+                      <div className="text-[11px] text-amber-800 font-medium">
+                        {lang === 'sv' ? '”Voff voff! Jag älskar fart!”' : '"Woof! I love speed!"'}
+                      </div>
+                    </div>
+                    <span className="text-xs bg-amber-200 text-amber-900 font-black px-2 py-1 rounded-lg">
+                      🔊
+                    </span>
+                  </button>
+                </div>
               </div>
 
               <div className="p-4 rounded-2xl bg-white border-2 border-slate-200 flex items-center justify-between">

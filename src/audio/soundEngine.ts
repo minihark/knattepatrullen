@@ -1,25 +1,56 @@
-// Web Audio synthesizer engine for rich, lag-free, tactile audio & speech
+// Web Audio synthesizer engine for rich, lag-free, tactile audio, engine rumble & speech
+
+function makeDistortionCurve(amount: number = 15): Float32Array {
+  const n_samples = 256;
+  const curve = new Float32Array(n_samples);
+  const deg = Math.PI / 180;
+  for (let i = 0; i < n_samples; ++i) {
+    const x = (i * 2) / n_samples - 1;
+    curve[i] = ((3 + amount) * x * 20 * deg) / (Math.PI + amount * Math.abs(x));
+  }
+  return curve;
+}
 
 class SoundEngine {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
+  private isMusicMuted: boolean = false;
 
-  // Continuous Engine Synthesizer Nodes
+  // Continuous Tactile Engine Synthesizer Nodes
   private engineOsc: OscillatorNode | null = null;
   private engineSubOsc: OscillatorNode | null = null;
+  private engineLfo: OscillatorNode | null = null;
+  private engineLfoGain: GainNode | null = null;
   private engineGain: GainNode | null = null;
   private engineFilter: BiquadFilterNode | null = null;
+  private engineDistortion: WaveShaperNode | null = null;
   private currentVehicleType: string = 'fire';
+
+  // Playful Background Chime Melody Generator
+  private isMusicPlaying: boolean = false;
+  private musicTimeoutId: any = null;
+  private currentMelodyStep: number = 0;
+  private readonly melodyNotes = [
+    261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 440.00, 392.00,
+    329.63, 392.00, 440.00, 523.25, 392.00, 329.63, 293.66, 261.63,
+  ]; // Friendly C-major pentatonic chime loop
+
   private cachedVoices: SpeechSynthesisVoice[] = [];
   private audioBuffers: Map<string, AudioBuffer> = new Map();
 
   constructor() {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.onvoiceschanged = () => {
-        try {
-          this.cachedVoices = window.speechSynthesis.getVoices();
-        } catch {}
-      };
+    if (typeof window !== 'undefined') {
+      try {
+        this.isMusicMuted = localStorage.getItem('knatte_music_muted') === 'true';
+      } catch {}
+
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = () => {
+          try {
+            this.cachedVoices = window.speechSynthesis.getVoices();
+          } catch {}
+        };
+      }
     }
   }
 
@@ -43,6 +74,9 @@ class SoundEngine {
     this.isMuted = muted;
     if (muted) {
       this.stopEngine();
+      this.stopMusic();
+    } else if (!this.isMusicMuted) {
+      this.startMusic();
     }
   }
 
@@ -51,7 +85,7 @@ class SoundEngine {
   }
 
   // ------------------------------------------------------------------
-  // 1. CONTINUOUS TACTILE ENGINE SOUND
+  // 1. CONTINUOUS TACTILE ENGINE RUMBLE SYNTHESIS
   // ------------------------------------------------------------------
   public startEngine(vehicleType: string = 'fire') {
     if (this.isMuted) return;
@@ -68,72 +102,107 @@ class SoundEngine {
     try {
       const osc = ctx.createOscillator();
       const subOsc = ctx.createOscillator();
+      const lfo = ctx.createOscillator();
+      const lfoGain = ctx.createGain();
       const gain = ctx.createGain();
       const filter = ctx.createBiquadFilter();
+      const shaper = ctx.createWaveShaper();
 
       // Configure based on vehicle
       if (vehicleType === 'tractor') {
+        // Deep chugging diesel stroke rumble
         osc.type = 'sawtooth';
-        subOsc.type = 'square';
-        osc.frequency.setValueAtTime(45, ctx.currentTime);
-        subOsc.frequency.setValueAtTime(22.5, ctx.currentTime);
+        subOsc.type = 'triangle';
+        osc.frequency.setValueAtTime(36, ctx.currentTime);
+        subOsc.frequency.setValueAtTime(18, ctx.currentTime);
+        lfo.frequency.setValueAtTime(6.0, ctx.currentTime);
         filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(320, ctx.currentTime);
+        filter.frequency.setValueAtTime(280, ctx.currentTime);
       } else if (vehicleType === 'rocket') {
+        // Sci-Fi ionic energy thruster
         osc.type = 'sine';
         subOsc.type = 'triangle';
-        osc.frequency.setValueAtTime(80, ctx.currentTime);
-        subOsc.frequency.setValueAtTime(160, ctx.currentTime);
+        osc.frequency.setValueAtTime(75, ctx.currentTime);
+        subOsc.frequency.setValueAtTime(150, ctx.currentTime);
+        lfo.frequency.setValueAtTime(12.0, ctx.currentTime);
         filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(480, ctx.currentTime);
+        filter.frequency.setValueAtTime(440, ctx.currentTime);
       } else {
-        // Fire truck / Jeep
+        // Fire truck / Jeep V8 rumble
         osc.type = 'triangle';
         subOsc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(55, ctx.currentTime);
-        subOsc.frequency.setValueAtTime(110, ctx.currentTime);
+        osc.frequency.setValueAtTime(46, ctx.currentTime);
+        subOsc.frequency.setValueAtTime(23, ctx.currentTime);
+        lfo.frequency.setValueAtTime(8.0, ctx.currentTime);
         filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(420, ctx.currentTime);
+        filter.frequency.setValueAtTime(340, ctx.currentTime);
       }
 
-      gain.gain.setValueAtTime(0.04, ctx.currentTime);
+      shaper.curve = makeDistortionCurve(16) as any;
+      shaper.oversample = '2x';
+
+      lfoGain.gain.setValueAtTime(0.015, ctx.currentTime);
+      gain.gain.setValueAtTime(0.045, ctx.currentTime);
+
+      // Connect LFO cylinder firing pulse to gain
+      lfo.connect(lfoGain);
+      lfoGain.connect(gain.gain);
 
       osc.connect(filter);
       subOsc.connect(filter);
-      filter.connect(gain);
+      filter.connect(shaper);
+      shaper.connect(gain);
       gain.connect(ctx.destination);
 
       osc.start();
       subOsc.start();
+      lfo.start();
 
       this.engineOsc = osc;
       this.engineSubOsc = subOsc;
+      this.engineLfo = lfo;
+      this.engineLfoGain = lfoGain;
       this.engineGain = gain;
       this.engineFilter = filter;
+      this.engineDistortion = shaper;
     } catch {}
   }
 
   public updateEngine(speedRatio: number, isDriving: boolean) {
     if (this.isMuted || !this.engineOsc || !this.engineGain || !this.ctx) return;
     const t = this.ctx.currentTime;
-    const clampedSpeed = Math.min(Math.max(speedRatio, 0), 1.5);
+    const clampedSpeed = Math.min(Math.max(speedRatio, 0), 1.6);
 
-    let baseFreq = 50;
-    if (this.currentVehicleType === 'tractor') baseFreq = 42;
-    if (this.currentVehicleType === 'rocket') baseFreq = 85;
-    if (this.currentVehicleType === 'rescue') baseFreq = 62;
+    let baseFreq = 46;
+    let lfoBase = 8.0;
+    if (this.currentVehicleType === 'tractor') {
+      baseFreq = 36;
+      lfoBase = 6.0;
+    }
+    if (this.currentVehicleType === 'rocket') {
+      baseFreq = 75;
+      lfoBase = 12.0;
+    }
+    if (this.currentVehicleType === 'rescue') {
+      baseFreq = 54;
+      lfoBase = 9.5;
+    }
 
-    const targetFreq = baseFreq + clampedSpeed * 75;
-    const targetGain = isDriving ? 0.08 + clampedSpeed * 0.06 : 0.035;
+    const targetFreq = baseFreq + clampedSpeed * 70;
+    const targetLfo = lfoBase + clampedSpeed * 14;
+    const targetGain = isDriving ? 0.085 + clampedSpeed * 0.05 : 0.04;
 
     this.engineOsc.frequency.setTargetAtTime(targetFreq, t, 0.06);
     if (this.engineSubOsc) {
-      this.engineSubOsc.frequency.setTargetAtTime(targetFreq * 1.5, t, 0.06);
+      this.engineSubOsc.frequency.setTargetAtTime(targetFreq * 0.5, t, 0.06);
+    }
+    if (this.engineLfo) {
+      this.engineLfo.frequency.setTargetAtTime(targetLfo, t, 0.08);
     }
     this.engineGain.gain.setTargetAtTime(targetGain, t, 0.05);
 
     if (this.engineFilter) {
-      this.engineFilter.frequency.setTargetAtTime(320 + clampedSpeed * 500, t, 0.08);
+      this.engineFilter.frequency.setTargetAtTime(280 + clampedSpeed * 480, t, 0.08);
     }
   }
 
@@ -149,9 +218,26 @@ class SoundEngine {
         this.engineSubOsc.disconnect();
         this.engineSubOsc = null;
       }
+      if (this.engineLfo) {
+        this.engineLfo.stop();
+        this.engineLfo.disconnect();
+        this.engineLfo = null;
+      }
+      if (this.engineLfoGain) {
+        this.engineLfoGain.disconnect();
+        this.engineLfoGain = null;
+      }
       if (this.engineGain) {
         this.engineGain.disconnect();
         this.engineGain = null;
+      }
+      if (this.engineFilter) {
+        this.engineFilter.disconnect();
+        this.engineFilter = null;
+      }
+      if (this.engineDistortion) {
+        this.engineDistortion.disconnect();
+        this.engineDistortion = null;
       }
     } catch {}
   }
@@ -349,7 +435,7 @@ class SoundEngine {
   }
 
   // Horns
-  public playHorn(type: 'horn' | 'quack' | 'siren' | 'boing' = 'horn') {
+  public playHorn(type: 'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog' = 'horn') {
     if (this.isMuted) return;
     const ctx = this.getContext();
     if (!ctx) return;
@@ -422,8 +508,169 @@ class SoundEngine {
 
       osc.start(t);
       osc.stop(t + 0.41);
+    } else if (type === 'cat') {
+      // Katten Misse meow: gentle feline formant glide
+      const osc = ctx.createOscillator();
+      const sub = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      osc.type = 'sawtooth';
+      sub.type = 'sine';
+
+      // Pitch glide: 420Hz -> 680Hz -> 360Hz
+      osc.frequency.setValueAtTime(420, t);
+      osc.frequency.exponentialRampToValueAtTime(680, t + 0.15);
+      osc.frequency.exponentialRampToValueAtTime(360, t + 0.38);
+
+      sub.frequency.setValueAtTime(210, t);
+      sub.frequency.exponentialRampToValueAtTime(340, t + 0.15);
+      sub.frequency.exponentialRampToValueAtTime(180, t + 0.38);
+
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1100, t);
+      filter.Q.setValueAtTime(3.2, t);
+
+      gain.gain.setValueAtTime(0.28, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+
+      osc.connect(filter);
+      sub.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(t);
+      sub.start(t);
+      osc.stop(t + 0.41);
+      sub.stop(t + 0.41);
+    } else if (type === 'dog') {
+      // Hunden Buster happy double bark: two quick percussive bursts
+      [0, 0.16].forEach((offset) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const filter = ctx.createBiquadFilter();
+        const st = t + offset;
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(240, st);
+        osc.frequency.exponentialRampToValueAtTime(105, st + 0.11);
+
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(800, st);
+
+        gain.gain.setValueAtTime(0.35, st);
+        gain.gain.exponentialRampToValueAtTime(0.001, st + 0.13);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(st);
+        osc.stop(st + 0.14);
+      });
     } else {
       this.playJump(1.2);
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // 2.5 BACKGROUND PLAYFUL CHIME MELODY (ZERO-DEPENDENCY WEB AUDIO)
+  // ------------------------------------------------------------------
+  public startMusic() {
+    if (this.isMuted || this.isMusicMuted || this.isMusicPlaying) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+    this.init();
+
+    this.isMusicPlaying = true;
+    this.currentMelodyStep = 0;
+    this.playNextMusicNote();
+  }
+
+  private playNextMusicNote = () => {
+    if (!this.isMusicPlaying || this.isMuted || this.isMusicMuted) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    try {
+      const noteFreq = this.melodyNotes[this.currentMelodyStep % this.melodyNotes.length];
+      const t = ctx.currentTime;
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(noteFreq, t);
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(950, t);
+
+      // Low volume chime that softly accompanies gameplay without overpowering SFX
+      gain.gain.setValueAtTime(0.05, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(t);
+      osc.stop(t + 0.4);
+
+      this.currentMelodyStep++;
+      this.musicTimeoutId = setTimeout(this.playNextMusicNote, 420);
+    } catch {}
+  };
+
+  public stopMusic() {
+    this.isMusicPlaying = false;
+    if (this.musicTimeoutId) {
+      clearTimeout(this.musicTimeoutId);
+      this.musicTimeoutId = null;
+    }
+  }
+
+  public toggleMusic(): boolean {
+    const next = !this.isMusicMuted;
+    this.isMusicMuted = next;
+    try {
+      localStorage.setItem('knatte_music_muted', String(next));
+    } catch {}
+    if (next) {
+      this.stopMusic();
+    } else {
+      this.startMusic();
+    }
+    return !next;
+  }
+
+  public isMusicOn(): boolean {
+    return !this.isMusicMuted;
+  }
+
+  // ------------------------------------------------------------------
+  // 2.6 ANIMAL FRIENDS VOICE TRACKS
+  // ------------------------------------------------------------------
+  public playAnimalVoice(animal: 'cat' | 'dog', lang: 'sv' | 'en' = 'sv') {
+    if (this.isMuted) return;
+    if (animal === 'cat') {
+      this.playHorn('cat');
+      const text =
+        lang === 'sv'
+          ? 'Mjau! Hej kompis, jag heter Katten Misse! Ska vi rejsa?'
+          : 'Meow! Hi buddy, I am Misse the Cat! Shall we race?';
+      setTimeout(() => {
+        this.playVoiceClip('cat_misse', text, lang);
+      }, 350);
+    } else {
+      this.playHorn('dog');
+      const text =
+        lang === 'sv'
+          ? 'Voff voff! Hej där! Jag heter Hunden Buster och jag älskar att köra fort!'
+          : 'Woof woof! Hello there! I am Buster the Dog and I love driving fast!';
+      setTimeout(() => {
+        this.playVoiceClip('dog_buster', text, lang);
+      }, 300);
     }
   }
 

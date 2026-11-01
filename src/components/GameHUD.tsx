@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { VehicleConfig, LevelConfig, CarUpgrades } from '../types';
 import { MenuModal } from './MenuModal';
-import { Compass } from 'lucide-react';
+import { Compass, Volume2, VolumeX, Music } from 'lucide-react';
 import { sounds } from '../audio/soundEngine';
 
 interface GameHUDProps {
@@ -18,6 +18,10 @@ interface GameHUDProps {
   onToggleLang: () => void;
   isMuted: boolean;
   onToggleMute: () => void;
+  isMusicOn: boolean;
+  onToggleMusic: () => void;
+  activeHorn: 'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog';
+  onSelectHorn: (h: 'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog') => void;
 }
 
 export const GameHUD: React.FC<GameHUDProps> = ({
@@ -34,6 +38,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   onToggleLang,
   isMuted,
   onToggleMute,
+  isMusicOn,
+  onToggleMusic,
+  activeHorn,
+  onSelectHorn,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [initialMenuTab, setInitialMenuTab] = useState<'levels' | 'garage' | 'settings'>('levels');
@@ -72,8 +80,27 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           </div>
         </button>
 
-        {/* Right: Garage, Stars & Menu Buttons */}
+        {/* Right: Sound Toggle, Garage, Stars & Menu Buttons */}
         <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2">
+          {/* Quick Sound/Mute Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              sounds.init();
+              onToggleMute();
+            }}
+            aria-label={isMuted ? 'Slå på ljud' : 'Stäng av ljud'}
+            className={`flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-2xl border-2 shadow-md active:scale-95 transition-all text-xs font-extrabold ${
+              isMuted
+                ? 'bg-rose-50/95 border-rose-300 text-rose-600'
+                : 'bg-white/95 border-slate-200/90 text-slate-800'
+            }`}
+            title={isMuted ? 'Ljud avstängt' : 'Ljud igång'}
+          >
+            {isMuted ? <VolumeX className="w-4 h-4 text-rose-500" /> : <Volume2 className="w-4 h-4 text-emerald-600" />}
+            {isMusicOn && !isMuted && <span className="text-[10px]">🎵</span>}
+          </button>
+
           {/* Quick Vehicle / Garage Button */}
           <button
             type="button"
@@ -129,6 +156,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         onToggleLang={onToggleLang}
         isMuted={isMuted}
         onToggleMute={onToggleMute}
+        isMusicOn={isMusicOn}
+        onToggleMusic={onToggleMusic}
+        activeHorn={activeHorn}
+        onSelectHorn={onSelectHorn}
         initialTab={initialMenuTab}
       />
     </>

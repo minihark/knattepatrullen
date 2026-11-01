@@ -22,6 +22,7 @@ interface GameCanvasProps {
   drivingBackward: boolean;
   isJumping: boolean;
   hornTrigger: number;
+  activeHorn?: 'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog';
   lang: 'sv' | 'en';
 }
 
@@ -39,8 +40,10 @@ interface AnimalProp {
   x: number;
   emoji: string;
   name: string;
+  type?: 'cat' | 'dog' | 'cow' | 'sheep' | 'rabbit' | 'squirrel';
   jumpY: number;
   jumpVy: number;
+  greeted?: boolean;
 }
 
 interface FloatingText {
@@ -73,6 +76,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   drivingBackward,
   isJumping,
   hornTrigger,
+  activeHorn,
   lang,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -126,10 +130,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     ] as CampfireProp[],
 
     animals: [
-      { x: 1200, emoji: '🐮', name: 'Klara Ko', jumpY: 0, jumpVy: 0 },
-      { x: 2500, emoji: '🐑', name: 'Ulla Ulltuss', jumpY: 0, jumpVy: 0 },
-      { x: 4100, emoji: '🐰', name: 'Pelle Kanin', jumpY: 0, jumpVy: 0 },
-      { x: 5500, emoji: '🐿️', name: 'Nils Ekorre', jumpY: 0, jumpVy: 0 },
+      { x: 950, emoji: '🐱', name: 'Katten Misse', jumpY: 0, jumpVy: 0, type: 'cat', greeted: false },
+      { x: 1900, emoji: '🐶', name: 'Hunden Buster', jumpY: 0, jumpVy: 0, type: 'dog', greeted: false },
+      { x: 3100, emoji: '🐮', name: 'Klara Ko', jumpY: 0, jumpVy: 0, type: 'cow', greeted: false },
+      { x: 4400, emoji: '🐰', name: 'Pelle Kanin', jumpY: 0, jumpVy: 0, type: 'rabbit', greeted: false },
+      { x: 5600, emoji: '🐿️', name: 'Nils Ekorre', jumpY: 0, jumpVy: 0, type: 'squirrel', greeted: false },
     ] as AnimalProp[],
 
     windmillAngle: 0,
@@ -167,7 +172,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   useEffect(() => {
     if (hornTrigger > 0) {
       const v = VEHICLES.find((v) => v.id === currentVehicle) || VEHICLES[0];
-      sounds.playHorn(v.honkSound);
+      sounds.playHorn(activeHorn || v.honkSound);
 
       const state = stateRef.current;
 
@@ -242,7 +247,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
       });
     }
-  }, [hornTrigger, currentVehicle]);
+  }, [hornTrigger, currentVehicle, activeHorn]);
 
   // Check if current checkpoint is solved
   const isCurrentCheckpointSolved = (): boolean => {
@@ -315,8 +320,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       { x: 4950, extinguished: false },
     ];
 
-    // Start realistic engine hum
+    // Start tactile engine rumble & playful background music
     sounds.startEngine(currentVehicle);
+    sounds.startMusic();
 
     // Generate main mission collectibles along the expanded track
     const items: CollectibleItem[] = [];
@@ -360,6 +366,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     return () => {
       sounds.stopEngine();
+      sounds.stopMusic();
     };
   }, [currentLevel.id, currentVehicle, lang]);
 
@@ -670,7 +677,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
       });
 
-      // Update Animals jumping physics
+      // Update Animals jumping physics & roadside greetings
       state.animals.forEach((animal) => {
         if (animal.jumpY < 0 || animal.jumpVy < 0) {
           animal.jumpVy += 20 * dt;
@@ -678,6 +685,34 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           if (animal.jumpY >= 0) {
             animal.jumpY = 0;
             animal.jumpVy = 0;
+          }
+        }
+
+        // Friendly roadside greeting when car drives close
+        const dist = Math.abs(state.carX - animal.x);
+        if (dist < 110 && !animal.greeted) {
+          animal.greeted = true;
+          animal.jumpVy = -8.5;
+
+          for (let p = 0; p < 3; p++) {
+            state.particles.push({
+              x: animal.x + (Math.random() - 0.5) * 20,
+              y: getGroundY(animal.x, state.canvasHeight) - 80,
+              vx: (Math.random() - 0.5) * 2,
+              vy: -3 - Math.random() * 2,
+              size: 18,
+              color: animal.type === 'cat' ? '#FB923C' : '#F59E0B',
+              alpha: 1,
+              life: 0,
+              maxLife: 40,
+              shape: p === 0 ? 'heart' : 'note',
+            });
+          }
+
+          if (animal.type === 'cat') {
+            sounds.playAnimalVoice('cat', lang);
+          } else if (animal.type === 'dog') {
+            sounds.playAnimalVoice('dog', lang);
           }
         }
       });

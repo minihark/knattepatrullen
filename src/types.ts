@@ -27,7 +27,7 @@ export interface VehicleConfig {
   color: string;
   wheelColor: string;
   roofLight: boolean;
-  honkSound: 'horn' | 'quack' | 'siren' | 'boing';
+  honkSound: 'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog';
   hornEmoji: string;
   descriptionSv: string;
   traits: VehicleTraits;
