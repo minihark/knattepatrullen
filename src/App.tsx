@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { VehicleConfig, LevelConfig, VehicleType, CarUpgrades, TimeOfDay } from './types';
 import { VEHICLES, LEVELS } from './data/gameData';
 import { GameCanvas } from './components/GameCanvas';
@@ -158,6 +158,99 @@ export const App: React.FC = () => {
     } catch {}
   }, [activeHorn]);
 
+  // Toddler Kiosk & Fullscreen Mode State
+  const [isToddlerLocked, setIsToddlerLocked] = useState<boolean>(false);
+  const [unlockTaps, setUnlockTaps] = useState<number>(0);
+  const unlockTimerRef = useRef<any>(null);
+  const wakeLockSentinelRef = useRef<any>(null);
+
+  const requestWakeLock = useCallback(async () => {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLockSentinelRef.current = await (navigator as any).wakeLock.request('screen');
+      }
+    } catch {}
+  }, []);
+
+  const releaseWakeLock = useCallback(async () => {
+    try {
+      if (wakeLockSentinelRef.current) {
+        await wakeLockSentinelRef.current.release();
+        wakeLockSentinelRef.current = null;
+      }
+    } catch {}
+  }, []);
+
+  const enterFullscreen = useCallback(async () => {
+    try {
+      const docEl = document.documentElement as any;
+      if (docEl.requestFullscreen) {
+        await docEl.requestFullscreen();
+      } else if (docEl.webkitRequestFullscreen) {
+        await docEl.webkitRequestFullscreen();
+      }
+    } catch {}
+  }, []);
+
+  const exitFullscreen = useCallback(async () => {
+    try {
+      const doc = document as any;
+      if (doc.exitFullscreen && doc.fullscreenElement) {
+        await doc.exitFullscreen();
+      } else if (doc.webkitExitFullscreen && doc.webkitFullscreenElement) {
+        await doc.webkitExitFullscreen();
+      }
+    } catch {}
+  }, []);
+
+  const handleActivateToddlerLock = useCallback(async () => {
+    sounds.init();
+    setIsToddlerLocked(true);
+    setUnlockTaps(0);
+    await enterFullscreen();
+    await requestWakeLock();
+    sounds.playLockSound(true);
+    sounds.playToddlerLockVoice(true, lang);
+  }, [enterFullscreen, requestWakeLock, lang]);
+
+  const handleTapUnlock = useCallback(() => {
+    sounds.init();
+    setUnlockTaps((prev) => {
+      const next = prev + 1;
+      if (next >= 3) {
+        if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
+        setIsToddlerLocked(false);
+        sounds.playLockSound(false);
+        sounds.playToddlerLockVoice(false, lang);
+        releaseWakeLock();
+        exitFullscreen();
+        return 0;
+      } else {
+        sounds.playLockTumbler(next);
+        if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
+        unlockTimerRef.current = setTimeout(() => {
+          setUnlockTaps(0);
+        }, 2500);
+        return next;
+      }
+    });
+  }, [lang, releaseWakeLock, exitFullscreen]);
+
+  // Keep screen awake while in toddler kiosk mode on tab refocus
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && isToddlerLocked) {
+        requestWakeLock();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
+      releaseWakeLock();
+    };
+  }, [isToddlerLocked, requestWakeLock, releaseWakeLock]);
+
   // Add stars helper
   const addStars = useCallback((num: number = 3) => {
     setStarsEarned((prev) => {
@@ -259,7 +352,14 @@ export const App: React.FC = () => {
   }, [triggerHonk]);
 
   return (
-    <div className="fixed inset-0 w-full h-[100dvh] overflow-hidden bg-slate-900 select-none">
+    <div
+      className={`fixed inset-0 w-full h-[100dvh] overflow-hidden bg-slate-900 select-none ${
+        isToddlerLocked ? 'touch-none ring-2 ring-inset ring-amber-400/25' : ''
+      }`}
+      onContextMenu={(e) => {
+        if (isToddlerLocked) e.preventDefault();
+      }}
+    >
       {/* Top HUD (Header, Mission Counter, Vehicle Picker, Levels) */}
       <GameHUD
         currentVehicle={currentVehicle}
@@ -285,6 +385,10 @@ export const App: React.FC = () => {
         onToggleMusic={handleToggleMusic}
         activeHorn={activeHorn}
         onSelectHorn={handleSelectHorn}
+        isToddlerLocked={isToddlerLocked}
+        unlockTaps={unlockTaps}
+        onTapUnlock={handleTapUnlock}
+        onActivateToddlerLock={handleActivateToddlerLock}
       />
 
       {/* Main 60fps Canvas Simulator */}

@@ -3,7 +3,7 @@ import { VehicleConfig, LevelConfig, CarUpgrades, TimeOfDay } from '../types';
 import { VEHICLES, LEVELS, UPGRADES_CONFIG } from '../data/gameData';
 import { sounds } from '../audio/soundEngine';
 import confetti from 'canvas-confetti';
-import { X, Volume2, VolumeX, Award, Play, Sparkles, Zap, Shield, ChevronRight, Music, Moon, Sun } from 'lucide-react';
+import { X, Volume2, VolumeX, Award, Play, Sparkles, Zap, Shield, ChevronRight, Music, Moon, Sun, Lock } from 'lucide-react';
 
 interface MenuModalProps {
   isOpen: boolean;
@@ -27,6 +27,7 @@ interface MenuModalProps {
   activeHorn: 'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog';
   onSelectHorn: (h: 'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog') => void;
   initialTab?: 'levels' | 'garage' | 'settings';
+  onActivateToddlerLock?: () => void;
 }
 
 export const MenuModal: React.FC<MenuModalProps> = ({
@@ -51,6 +52,7 @@ export const MenuModal: React.FC<MenuModalProps> = ({
   activeHorn,
   onSelectHorn,
   initialTab = 'levels',
+  onActivateToddlerLock,
 }) => {
   const [activeTab, setActiveTab] = useState<'levels' | 'garage' | 'settings'>(initialTab);
 
@@ -578,6 +580,41 @@ export const MenuModal: React.FC<MenuModalProps> = ({
                   }`}
                 >
                   {timeOfDay === 'night' ? (lang === 'sv' ? '🌙 Natt' : '🌙 Night') : (lang === 'sv' ? '☀️ Dag' : '☀️ Day')}
+                </button>
+              </div>
+
+              {/* Toddler Kiosk Lock Mode */}
+              <div className="p-4 rounded-2xl bg-amber-50/80 border-2 border-amber-300 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-800">
+                    <Lock className="w-5 h-5 text-amber-700" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-amber-950 text-sm flex items-center gap-1.5">
+                      <span>{lang === 'sv' ? 'Barnlås & Fullskärm' : 'Toddler Lock & Fullscreen'}</span>
+                      <span className="text-[10px] font-black uppercase text-amber-800 bg-amber-200/80 px-1.5 py-0.5 rounded">
+                        {lang === 'sv' ? 'Kiosk' : 'Kiosk'}
+                      </span>
+                    </h4>
+                    <p className="text-xs text-amber-800/80">
+                      {lang === 'sv'
+                        ? 'Låser menyer och håller skärmen vaken så barnet kan köra utan avbrott'
+                        : 'Locks menus & keeps screen awake so kids can drive without interruption'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.init();
+                    onClose();
+                    onActivateToddlerLock?.();
+                  }}
+                  className="px-4 py-2 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-600 active:scale-95 text-white shadow-sm flex items-center gap-1.5 shrink-0"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>{lang === 'sv' ? 'Lås för lek' : 'Lock for Play'}</span>
                 </button>
               </div>
 

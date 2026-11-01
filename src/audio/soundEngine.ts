@@ -846,6 +846,107 @@ class SoundEngine {
     this.playVoiceClip('day_mode', fallbackText, lang);
   }
 
+  // ------------------------------------------------------------------
+  // 2.8 TODDLER KIOSK & IMMERSIVE PARENT LOCK
+  // ------------------------------------------------------------------
+  public playLockTumbler(step: number = 1) {
+    if (this.isMuted) return;
+    triggerHaptic(20);
+    const ctx = this.getContext();
+    if (!ctx) return;
+    this.init();
+
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    const freq = step === 1 ? 580 : step === 2 ? 760 : 960;
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, t);
+    osc.frequency.exponentialRampToValueAtTime(freq * 1.3, t + 0.04);
+
+    gain.gain.setValueAtTime(0.28, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(t);
+    osc.stop(t + 0.055);
+  }
+
+  public playLockSound(locked: boolean) {
+    if (this.isMuted) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+    this.init();
+
+    const t = ctx.currentTime;
+
+    if (locked) {
+      triggerHaptic([25, 40, 30]);
+      // Stage 1: Sharp mechanical latch click
+      const snap = ctx.createOscillator();
+      const snapGain = ctx.createGain();
+      snap.type = 'square';
+      snap.frequency.setValueAtTime(880, t);
+      snap.frequency.exponentialRampToValueAtTime(440, t + 0.04);
+      snapGain.gain.setValueAtTime(0.22, t);
+      snapGain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+      snap.connect(snapGain);
+      snapGain.connect(ctx.destination);
+      snap.start(t);
+      snap.stop(t + 0.05);
+
+      // Stage 2: Heavy bolt clunk
+      const bolt = ctx.createOscillator();
+      const boltGain = ctx.createGain();
+      bolt.type = 'sine';
+      bolt.frequency.setValueAtTime(220, t + 0.03);
+      bolt.frequency.exponentialRampToValueAtTime(110, t + 0.12);
+      boltGain.gain.setValueAtTime(0.35, t + 0.03);
+      boltGain.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+      bolt.connect(boltGain);
+      boltGain.connect(ctx.destination);
+      bolt.start(t + 0.03);
+      bolt.stop(t + 0.14);
+    } else {
+      triggerHaptic([15, 30, 25]);
+      // Ascending unlock arpeggio: C5 -> E5 -> G5
+      const notes = [523.25, 659.25, 783.99];
+      notes.forEach((freq, idx) => {
+        const nt = t + idx * 0.07;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, nt);
+
+        gain.gain.setValueAtTime(0.22, nt);
+        gain.gain.exponentialRampToValueAtTime(0.001, nt + 0.22);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(nt);
+        osc.stop(nt + 0.23);
+      });
+    }
+  }
+
+  public playToddlerLockVoice(locked: boolean, lang: 'sv' | 'en' = 'sv') {
+    if (locked) {
+      const fallback =
+        lang === 'sv'
+          ? 'Barnlås aktiverat! Nu kan du köra fritt!'
+          : 'Toddler lock activated! Have fun driving!';
+      this.playVoiceClip('lock_on', fallback, lang);
+    } else {
+      const fallback =
+        lang === 'sv' ? 'Barnlås upplåst!' : 'Toddler lock unlocked!';
+      this.playVoiceClip('lock_off', fallback, lang);
+    }
+  }
+
   public playSnap() {
     if (this.isMuted) return;
     const ctx = this.getContext();
