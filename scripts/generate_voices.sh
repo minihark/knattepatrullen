@@ -90,4 +90,12 @@ gen_en "en_level_math" "Math Workshop! Help Boris the Beaver solve the plus puzz
 gen_en "en_level_colors" "Rainbow Color Party! Collect all four colors to paint the rainbow!"
 gen_en "en_level_beach" "Starlight Beach! Collect five golden glittering stars!"
 
+# Swedish Animal Friends
+gen_sv "sv_cat_misse" "Mjau! Hej kompis, jag heter Katten Misse! Ska vi rejsa?"
+gen_sv "sv_dog_buster" "Voff voff! Hej där! Jag heter Hunden Buster och jag älskar att köra fort!"
+
+# English Animal Friends
+gen_en "en_cat_misse" "Meow! Hello buddy, I am Misse the Cat! Shall we race?"
+gen_en "en_dog_buster" "Woof woof! Hello there! I am Buster the Dog and I love driving fast!"
+
 echo "All voice files generated successfully!"

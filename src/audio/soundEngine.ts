@@ -11,6 +11,14 @@ function makeDistortionCurve(amount: number = 15): Float32Array {
   return curve;
 }
 
+function triggerHaptic(durationMs: number = 15) {
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    try {
+      navigator.vibrate(durationMs);
+    } catch {}
+  }
+}
+
 class SoundEngine {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
@@ -26,10 +34,12 @@ class SoundEngine {
   private engineDistortion: WaveShaperNode | null = null;
   private currentVehicleType: string = 'fire';
 
-  // Playful Background Chime Melody Generator
+  // Playful Background Chime Melody Generator with Web Audio Look-Ahead Scheduler
   private isMusicPlaying: boolean = false;
-  private musicTimeoutId: any = null;
+  private musicSchedulerTimer: any = null;
+  private nextNoteTime: number = 0;
   private currentMelodyStep: number = 0;
+  private readonly NOTE_STEP_SECONDS = 0.42; // ~142 BPM
   private readonly melodyNotes = [
     261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 440.00, 392.00,
     329.63, 392.00, 440.00, 523.25, 392.00, 329.63, 293.66, 261.63,
@@ -75,8 +85,11 @@ class SoundEngine {
     if (muted) {
       this.stopEngine();
       this.stopMusic();
-    } else if (!this.isMusicMuted) {
-      this.startMusic();
+    } else {
+      this.startEngine(this.currentVehicleType);
+      if (!this.isMusicMuted) {
+        this.startMusic();
+      }
     }
   }
 
@@ -249,6 +262,7 @@ class SoundEngine {
   // Jump / Spring Boing
   public playJump(power: number = 1.0) {
     if (this.isMuted) return;
+    triggerHaptic(12);
     const ctx = this.getContext();
     if (!ctx) return;
     this.init();
@@ -274,6 +288,7 @@ class SoundEngine {
   // Deep Suspension Landing Thud
   public playLand(strength: number = 1.0) {
     if (this.isMuted) return;
+    triggerHaptic(18);
     const ctx = this.getContext();
     if (!ctx) return;
 
@@ -437,6 +452,7 @@ class SoundEngine {
   // Horns
   public playHorn(type: 'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog' = 'horn') {
     if (this.isMuted) return;
+    triggerHaptic(20);
     const ctx = this.getContext();
     if (!ctx) return;
     this.init();
@@ -574,7 +590,7 @@ class SoundEngine {
   }
 
   // ------------------------------------------------------------------
-  // 2.5 BACKGROUND PLAYFUL CHIME MELODY (ZERO-DEPENDENCY WEB AUDIO)
+  // 2.5 BACKGROUND PLAYFUL CHIME MELODY (LOOK-AHEAD WEB AUDIO SCHEDULER)
   // ------------------------------------------------------------------
   public startMusic() {
     if (this.isMuted || this.isMusicMuted || this.isMusicPlaying) return;
@@ -584,49 +600,59 @@ class SoundEngine {
 
     this.isMusicPlaying = true;
     this.currentMelodyStep = 0;
-    this.playNextMusicNote();
+    this.nextNoteTime = ctx.currentTime + 0.05;
+    this.scheduleMusic();
   }
 
-  private playNextMusicNote = () => {
+  private scheduleMusic = () => {
     if (!this.isMusicPlaying || this.isMuted || this.isMusicMuted) return;
     const ctx = this.getContext();
     if (!ctx) return;
 
+    // Look-ahead schedule notes 200ms ahead to prevent jitter or background timer drift
+    while (this.nextNoteTime < ctx.currentTime + 0.22) {
+      this.playChimeNote(this.nextNoteTime);
+      this.nextNoteTime += this.NOTE_STEP_SECONDS;
+    }
+
+    this.musicSchedulerTimer = setTimeout(this.scheduleMusic, 50);
+  };
+
+  private playChimeNote(targetTime: number) {
+    const ctx = this.getContext();
+    if (!ctx) return;
     try {
       const noteFreq = this.melodyNotes[this.currentMelodyStep % this.melodyNotes.length];
-      const t = ctx.currentTime;
-
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       const filter = ctx.createBiquadFilter();
 
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(noteFreq, t);
+      osc.frequency.setValueAtTime(noteFreq, targetTime);
 
       filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(950, t);
+      filter.frequency.setValueAtTime(950, targetTime);
 
       // Low volume chime that softly accompanies gameplay without overpowering SFX
-      gain.gain.setValueAtTime(0.05, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+      gain.gain.setValueAtTime(0.045, targetTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, targetTime + 0.38);
 
       osc.connect(filter);
       filter.connect(gain);
       gain.connect(ctx.destination);
 
-      osc.start(t);
-      osc.stop(t + 0.4);
+      osc.start(targetTime);
+      osc.stop(targetTime + 0.4);
 
       this.currentMelodyStep++;
-      this.musicTimeoutId = setTimeout(this.playNextMusicNote, 420);
     } catch {}
-  };
+  }
 
   public stopMusic() {
     this.isMusicPlaying = false;
-    if (this.musicTimeoutId) {
-      clearTimeout(this.musicTimeoutId);
-      this.musicTimeoutId = null;
+    if (this.musicSchedulerTimer) {
+      clearTimeout(this.musicSchedulerTimer);
+      this.musicSchedulerTimer = null;
     }
   }
 
