@@ -93,9 +93,13 @@ gen_en "en_level_beach" "Starlight Beach! Collect five golden glittering stars!"
 # Swedish Animal Friends
 gen_sv "sv_cat_misse" "Mjau! Hej kompis, jag heter Katten Misse! Ska vi rejsa?"
 gen_sv "sv_dog_buster" "Voff voff! Hej där! Jag heter Hunden Buster och jag älskar att köra fort!"
+gen_sv "sv_moose_helge" "Mööö! Hej från älgen Helge! Kör lugnt och fint i skogen!"
+gen_sv "sv_fox_rune" "Tjoho! Jag heter räven Rune! Vilken superfin bil du kör!"
 
 # English Animal Friends
 gen_en "en_cat_misse" "Meow! Hello buddy, I am Misse the Cat! Shall we race?"
 gen_en "en_dog_buster" "Woof woof! Hello there! I am Buster the Dog and I love driving fast!"
+gen_en "en_moose_helge" "Mooo! Hello from Helge the Moose! Drive safe and gentle through the forest!"
+gen_en "en_fox_rune" "Yahoo! I am Rune the Fox! What a wonderful car you are driving!"
 
 echo "All voice files generated successfully!"

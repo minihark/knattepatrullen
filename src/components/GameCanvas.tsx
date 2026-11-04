@@ -41,10 +41,15 @@ interface AnimalProp {
   x: number;
   emoji: string;
   name: string;
-  type?: 'cat' | 'dog' | 'cow' | 'sheep' | 'rabbit' | 'squirrel' | 'owl';
+  type?: 'cat' | 'dog' | 'cow' | 'sheep' | 'rabbit' | 'squirrel' | 'owl' | 'moose' | 'fox';
   jumpY: number;
   jumpVy: number;
   greeted?: boolean;
+  isCrossing?: boolean;
+  crossingX?: number;
+  crossingProgress?: number;
+  facing?: number;
+  speechBubble?: { text: string; timer: number } | null;
 }
 
 interface FloatingText {
@@ -101,6 +106,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     lastVy: 0,
     blinkTimer: 0,
     isBlinking: false,
+    isBrakingForAnimal: false,
+    brakeSquash: 0,
 
     // Tractor Trailer State
     trailerX: 125,
@@ -134,11 +141,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     animals: [
       { x: 950, emoji: '🐱', name: 'Katten Misse', jumpY: 0, jumpVy: 0, type: 'cat', greeted: false },
       { x: 1450, emoji: '🦉', name: 'Ugglan Ulla', jumpY: 0, jumpVy: 0, type: 'owl', greeted: false },
-      { x: 1900, emoji: '🐶', name: 'Hunden Buster', jumpY: 0, jumpVy: 0, type: 'dog', greeted: false },
-      { x: 3100, emoji: '🐮', name: 'Klara Ko', jumpY: 0, jumpVy: 0, type: 'cow', greeted: false },
+      { x: 1950, emoji: '🦊', name: 'Räven Rune', jumpY: 0, jumpVy: 0, type: 'fox', greeted: false, isCrossing: true, crossingX: 1950, crossingProgress: 0, facing: -1 },
+      { x: 2650, emoji: '🫎', name: 'Älgen Helge', jumpY: 0, jumpVy: 0, type: 'moose', greeted: false, isCrossing: true, crossingX: 2650, crossingProgress: 0, facing: -1 },
+      { x: 3300, emoji: '🐶', name: 'Hunden Buster', jumpY: 0, jumpVy: 0, type: 'dog', greeted: false },
       { x: 3850, emoji: '🦉', name: 'Ugglan Ulla', jumpY: 0, jumpVy: 0, type: 'owl', greeted: false },
-      { x: 4400, emoji: '🐰', name: 'Pelle Kanin', jumpY: 0, jumpVy: 0, type: 'rabbit', greeted: false },
-      { x: 5600, emoji: '🐿️', name: 'Nils Ekorre', jumpY: 0, jumpVy: 0, type: 'squirrel', greeted: false },
+      { x: 4350, emoji: '🦊', name: 'Räven Rune', jumpY: 0, jumpVy: 0, type: 'fox', greeted: false, isCrossing: true, crossingX: 4350, crossingProgress: 0, facing: -1 },
+      { x: 4950, emoji: '🫎', name: 'Älgen Helge', jumpY: 0, jumpVy: 0, type: 'moose', greeted: false, isCrossing: true, crossingX: 4950, crossingProgress: 0, facing: -1 },
+      { x: 5500, emoji: '🐰', name: 'Pelle Kanin', jumpY: 0, jumpVy: 0, type: 'rabbit', greeted: false },
+      { x: 6050, emoji: '🐿️', name: 'Nils Ekorre', jumpY: 0, jumpVy: 0, type: 'squirrel', greeted: false },
     ] as AnimalProp[],
 
     windmillAngle: 0,
@@ -232,26 +242,44 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         });
       }
 
-      // Animals jump!
+      // Animals jump & react to horn!
       state.animals.forEach((animal) => {
-        if (Math.abs(state.carX - animal.x) < 450) {
-          animal.jumpVy = -7;
-          state.particles.push({
-            x: animal.x,
-            y: getGroundY(animal.x, state.canvasHeight) - 75,
-            vx: (Math.random() - 0.5) * 3,
-            vy: -3,
-            size: 20,
-            color: '#EC4899',
-            alpha: 1,
-            life: 0,
-            maxLife: 35,
-            shape: 'heart',
-          });
+        if (Math.abs(state.carX - animal.x) < 480) {
+          animal.jumpVy = animal.type === 'moose' ? -5.5 : -8.5;
+          animal.greeted = true;
+
+          if (animal.type === 'moose') {
+            sounds.playMooseSound();
+            animal.speechBubble = {
+              text: lang === 'sv' ? 'Mööö! 🫎' : 'Mooo! 🫎',
+              timer: 3.0,
+            };
+          } else if (animal.type === 'fox') {
+            sounds.playFoxSound();
+            animal.speechBubble = {
+              text: lang === 'sv' ? 'Tjoho! 🦊' : 'Yahoo! 🦊',
+              timer: 3.0,
+            };
+          }
+
+          for (let p = 0; p < 4; p++) {
+            state.particles.push({
+              x: animal.x + (Math.random() - 0.5) * 20,
+              y: getGroundY(animal.x, state.canvasHeight) - 75,
+              vx: (Math.random() - 0.5) * 3,
+              vy: -3 - Math.random() * 2,
+              size: 20,
+              color: animal.type === 'moose' ? '#A16207' : animal.type === 'fox' ? '#EA580C' : '#EC4899',
+              alpha: 1,
+              life: 0,
+              maxLife: 35,
+              shape: p % 2 === 0 ? 'heart' : 'note',
+            });
+          }
         }
       });
     }
-  }, [hornTrigger, currentVehicle, activeHorn]);
+  }, [hornTrigger, currentVehicle, activeHorn, lang]);
 
   // Check if current checkpoint is solved
   const isCurrentCheckpointSolved = (): boolean => {
@@ -317,6 +345,21 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     state.boostCooldown = 0;
 
     state.goalX = 6600;
+    state.isBrakingForAnimal = false;
+
+    // Reset animals & forest crossing wildlife
+    state.animals = [
+      { x: 950, emoji: '🐱', name: 'Katten Misse', jumpY: 0, jumpVy: 0, type: 'cat', greeted: false },
+      { x: 1450, emoji: '🦉', name: 'Ugglan Ulla', jumpY: 0, jumpVy: 0, type: 'owl', greeted: false },
+      { x: 1950, emoji: '🦊', name: 'Räven Rune', jumpY: 0, jumpVy: 0, type: 'fox', greeted: false, isCrossing: true, crossingX: 1950, crossingProgress: 0, facing: -1 },
+      { x: 2650, emoji: '🫎', name: 'Älgen Helge', jumpY: 0, jumpVy: 0, type: 'moose', greeted: false, isCrossing: true, crossingX: 2650, crossingProgress: 0, facing: -1 },
+      { x: 3300, emoji: '🐶', name: 'Hunden Buster', jumpY: 0, jumpVy: 0, type: 'dog', greeted: false },
+      { x: 3850, emoji: '🦉', name: 'Ugglan Ulla', jumpY: 0, jumpVy: 0, type: 'owl', greeted: false },
+      { x: 4350, emoji: '🦊', name: 'Räven Rune', jumpY: 0, jumpVy: 0, type: 'fox', greeted: false, isCrossing: true, crossingX: 4350, crossingProgress: 0, facing: -1 },
+      { x: 4950, emoji: '🫎', name: 'Älgen Helge', jumpY: 0, jumpVy: 0, type: 'moose', greeted: false, isCrossing: true, crossingX: 4950, crossingProgress: 0, facing: -1 },
+      { x: 5500, emoji: '🐰', name: 'Pelle Kanin', jumpY: 0, jumpVy: 0, type: 'rabbit', greeted: false },
+      { x: 6050, emoji: '🐿️', name: 'Nils Ekorre', jumpY: 0, jumpVy: 0, type: 'squirrel', greeted: false },
+    ];
 
     // Reset campfires
     state.campfires = [
@@ -423,6 +466,30 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       // Update engine audio frequency
       const speedRatio = Math.abs(state.vx) / maxSpeed;
       sounds.updateEngine(speedRatio, state.drivingForward || state.drivingBackward);
+
+      // Safe Auto-Braking when approaching crossing wildlife
+      let nearCrossingAnimal = false;
+      for (const animal of state.animals) {
+        if (animal.isCrossing) {
+          const dx = animal.x - state.carX;
+          if (dx > 0 && dx < 280) {
+            nearCrossingAnimal = true;
+            state.vx = Math.max(0, state.vx - state.vx * 4.2 * dt);
+            if (state.vx > 32) state.vx = 32;
+
+            state.suspension = Math.min(6, state.suspension + 18 * dt);
+
+            if (!state.isBrakingForAnimal) {
+              state.isBrakingForAnimal = true;
+              sounds.playBrakeSound();
+            }
+            break;
+          }
+        }
+      }
+      if (!nearCrossingAnimal) {
+        state.isBrakingForAnimal = false;
+      }
 
       if (state.drivingForward && !state.hasReachedGoal) {
         state.vx += accel * dt;
@@ -681,8 +748,32 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
       });
 
-      // Update Animals jumping physics & roadside greetings
+      // Update Animals jumping physics, crossing movement & greetings
       state.animals.forEach((animal) => {
+        // Speech bubble duration
+        if (animal.speechBubble) {
+          animal.speechBubble.timer -= dt;
+          if (animal.speechBubble.timer <= 0) {
+            animal.speechBubble = undefined;
+          }
+        }
+
+        // Crossing wildlife leisurely patrol movement
+        if (animal.isCrossing && animal.crossingX !== undefined && animal.facing !== undefined) {
+          const patrolRange = 75;
+          const speed = 22; // Gentle toddler-friendly walk speed
+          animal.x += animal.facing * speed * dt;
+          const minX = animal.crossingX - patrolRange;
+          const maxX = animal.crossingX + patrolRange;
+          if (animal.x > maxX) {
+            animal.x = maxX;
+            animal.facing = -1;
+          } else if (animal.x < minX) {
+            animal.x = minX;
+            animal.facing = 1;
+          }
+        }
+
         if (animal.jumpY < 0 || animal.jumpVy < 0) {
           animal.jumpVy += 20 * dt;
           animal.jumpY += animal.jumpVy;
@@ -694,9 +785,20 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
         // Friendly roadside greeting when car drives close
         const dist = Math.abs(state.carX - animal.x);
-        if (dist < 110 && !animal.greeted) {
+        if (dist < 125 && !animal.greeted) {
           animal.greeted = true;
-          animal.jumpVy = -8.5;
+          animal.jumpVy = animal.type === 'moose' ? -5.5 : -8.5;
+
+          const particleColor =
+            animal.type === 'cat'
+              ? '#FB923C'
+              : animal.type === 'dog'
+              ? '#F59E0B'
+              : animal.type === 'moose'
+              ? '#A16207'
+              : animal.type === 'fox'
+              ? '#EA580C'
+              : '#9333EA';
 
           for (let p = 0; p < 3; p++) {
             state.particles.push({
@@ -705,7 +807,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
               vx: (Math.random() - 0.5) * 2,
               vy: -3 - Math.random() * 2,
               size: 18,
-              color: animal.type === 'cat' ? '#FB923C' : '#F59E0B',
+              color: particleColor,
               alpha: 1,
               life: 0,
               maxLife: 40,
@@ -719,6 +821,18 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             sounds.playAnimalVoice('dog', lang);
           } else if (animal.type === 'owl') {
             sounds.playOwlVoice(lang);
+          } else if (animal.type === 'moose') {
+            sounds.playAnimalVoice('moose', lang);
+            animal.speechBubble = {
+              text: lang === 'sv' ? 'Mööö! Älgen Helge 🫎' : 'Mooo! Helge the Moose 🫎',
+              timer: 3.5,
+            };
+          } else if (animal.type === 'fox') {
+            sounds.playAnimalVoice('fox', lang);
+            animal.speechBubble = {
+              text: lang === 'sv' ? 'Tjoho! Räven Rune 🦊' : 'Yahoo! Rune the Fox 🦊',
+              timer: 3.5,
+            };
           }
         }
       });
@@ -1404,6 +1518,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       // Animals
       state.animals.forEach((animal) => {
         const ay = getGroundY(animal.x, viewH);
+
+        // Ground shadow under animal
+        ctx.save();
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.16)';
+        ctx.beginPath();
+        const shadowScale = Math.max(0.4, 1 - Math.abs(animal.jumpY) / 60);
+        ctx.ellipse(animal.x, ay - 4, (animal.type === 'moose' ? 26 : 18) * shadowScale, 6 * shadowScale, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
         ctx.save();
         ctx.translate(animal.x, ay - 32 + animal.jumpY);
 
@@ -1429,10 +1553,62 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           }
         }
 
-        ctx.font = '52px sans-serif';
+        // Horizontal facing flip for walking / crossing wildlife
+        if (animal.facing !== undefined) {
+          ctx.scale(animal.facing < 0 ? 1 : -1, 1);
+        }
+
+        const fontSize = animal.type === 'moose' ? 62 : 52;
+        ctx.font = `${fontSize}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.fillText(animal.emoji, 0, 0);
         ctx.restore();
+
+        // Speech bubble pill if animal is speaking or honked at
+        if (animal.speechBubble) {
+          ctx.save();
+          const bubbleY = ay - (animal.type === 'moose' ? 78 : 68) + animal.jumpY;
+          ctx.font = 'bold 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+          const textMetrics = ctx.measureText(animal.speechBubble.text);
+          const bubbleW = textMetrics.width + 24;
+          const bubbleH = 30;
+
+          // Gentle floating animation
+          const bobY = Math.sin(now * 0.008) * 3;
+
+          // Bubble background pill
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.18)';
+          ctx.shadowBlur = 8;
+          ctx.shadowOffsetY = 3;
+          ctx.beginPath();
+          ctx.roundRect(animal.x - bubbleW / 2, bubbleY - bubbleH + bobY, bubbleW, bubbleH, 15);
+          ctx.fill();
+
+          // Bubble border
+          ctx.shadowColor = 'transparent';
+          ctx.strokeStyle =
+            animal.type === 'moose' ? '#B45309' : animal.type === 'fox' ? '#EA580C' : '#3B82F6';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // Speech bubble pointer beak pointing down
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+          ctx.beginPath();
+          ctx.moveTo(animal.x - 5, bubbleY + bobY);
+          ctx.lineTo(animal.x, bubbleY + 6 + bobY);
+          ctx.lineTo(animal.x + 5, bubbleY + bobY);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          // Text inside bubble
+          ctx.fillStyle = '#1E293B';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(animal.speechBubble.text, animal.x, bubbleY - bubbleH / 2 + bobY);
+          ctx.restore();
+        }
       });
 
       // Night Fireflies (Eldflugor & Lysmaskar)

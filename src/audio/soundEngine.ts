@@ -675,9 +675,92 @@ class SoundEngine {
   }
 
   // ------------------------------------------------------------------
-  // 2.6 ANIMAL FRIENDS VOICE TRACKS
+  // 2.6 ANIMAL FRIENDS & FOREST WILDLIFE VOICE TRACKS
   // ------------------------------------------------------------------
-  public playAnimalVoice(animal: 'cat' | 'dog', lang: 'sv' | 'en' = 'sv') {
+  public playMooseSound() {
+    if (this.isMuted) return;
+    triggerHaptic(20);
+    const ctx = this.getContext();
+    if (!ctx) return;
+    this.init();
+    const t = ctx.currentTime;
+
+    // Deep majestic moose call / resonance (145Hz -> 80Hz)
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(145, t);
+    osc.frequency.exponentialRampToValueAtTime(80, t + 0.45);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(320, t);
+
+    gain.gain.setValueAtTime(0.28, t);
+    gain.gain.linearRampToValueAtTime(0.35, t + 0.15);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(t);
+    osc.stop(t + 0.56);
+  }
+
+  public playFoxSound() {
+    if (this.isMuted) return;
+    triggerHaptic(15);
+    const ctx = this.getContext();
+    if (!ctx) return;
+    this.init();
+    const t = ctx.currentTime;
+
+    // Playful dual-frequency fox chirp (750Hz -> 1350Hz)
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(750, t);
+    osc.frequency.exponentialRampToValueAtTime(1350, t + 0.08);
+    osc.frequency.exponentialRampToValueAtTime(950, t + 0.16);
+
+    gain.gain.setValueAtTime(0.22, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(t);
+    osc.stop(t + 0.21);
+  }
+
+  public playBrakeSound() {
+    if (this.isMuted) return;
+    triggerHaptic(12);
+    const ctx = this.getContext();
+    if (!ctx) return;
+    this.init();
+    const t = ctx.currentTime;
+
+    // Soft rubber tire glide / gentle deceleration hum (220Hz -> 75Hz)
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(220, t);
+    osc.frequency.exponentialRampToValueAtTime(75, t + 0.35);
+
+    gain.gain.setValueAtTime(0.18, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.4);
+  }
+
+  public playAnimalVoice(animal: 'cat' | 'dog' | 'moose' | 'fox', lang: 'sv' | 'en' = 'sv') {
     if (this.isMuted) return;
     if (animal === 'cat') {
       this.playHorn('cat');
@@ -688,7 +771,7 @@ class SoundEngine {
       setTimeout(() => {
         this.playVoiceClip('cat_misse', text, lang);
       }, 350);
-    } else {
+    } else if (animal === 'dog') {
       this.playHorn('dog');
       const text =
         lang === 'sv'
@@ -696,6 +779,24 @@ class SoundEngine {
           : 'Woof woof! Hello there! I am Buster the Dog and I love driving fast!';
       setTimeout(() => {
         this.playVoiceClip('dog_buster', text, lang);
+      }, 300);
+    } else if (animal === 'moose') {
+      this.playMooseSound();
+      const text =
+        lang === 'sv'
+          ? 'Mööö! Hej från älgen Helge! Kör lugnt och fint i skogen!'
+          : 'Mooo! Hello from Helge the Moose! Drive safe and gentle through the forest!';
+      setTimeout(() => {
+        this.playVoiceClip('moose_helge', text, lang);
+      }, 350);
+    } else if (animal === 'fox') {
+      this.playFoxSound();
+      const text =
+        lang === 'sv'
+          ? 'Tjoho! Jag heter räven Rune! Vilken superfin bil du kör!'
+          : 'Yahoo! I am Rune the Fox! What a wonderful car you are driving!';
+      setTimeout(() => {
+        this.playVoiceClip('fox_rune', text, lang);
       }, 300);
     }
   }
