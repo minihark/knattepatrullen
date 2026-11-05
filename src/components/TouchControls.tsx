@@ -1,6 +1,6 @@
 import React from 'react';
-import { ArrowLeft, ArrowRight, ArrowUp, RefreshCw } from 'lucide-react';
-import { VehicleConfig } from '../types';
+import { ArrowLeft, ArrowRight, ArrowUp, RefreshCw, Camera } from 'lucide-react';
+import { VehicleConfig, NearbyAnimalPrompt } from '../types';
 
 export const HORN_EMOJIS: Record<string, string> = {
   horn: '📢',
@@ -22,6 +22,8 @@ interface TouchControlsProps {
   onJumpStart: () => void;
   onJumpEnd: () => void;
   onHonk: () => void;
+  nearbyAnimal?: NearbyAnimalPrompt | null;
+  onSnapPhoto?: () => void;
   lang: 'sv' | 'en';
 }
 
@@ -36,11 +38,48 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
   onJumpStart,
   onJumpEnd,
   onHonk,
+  nearbyAnimal,
+  onSnapPhoto,
   lang,
 }) => {
   const currentHornEmoji = activeHorn ? HORN_EMOJIS[activeHorn] || vehicle.hornEmoji : vehicle.hornEmoji;
+  const animalShortName = nearbyAnimal
+    ? (lang === 'sv' ? nearbyAnimal.nameSv : nearbyAnimal.nameEn)
+    : '';
+
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-6 sm:bottom-10 pb-[env(safe-area-inset-bottom,24px)] px-5 sm:px-12 flex justify-between items-end z-30 select-none">
+      {/* Contextual Safari Polaroid Shutter Trigger (Appears ONLY when near an animal friend) */}
+      {nearbyAnimal && onSnapPhoto && (
+        <div className="pointer-events-auto absolute left-1/2 -translate-x-1/2 bottom-28 sm:bottom-4 z-40 animate-bounce">
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              onSnapPhoto();
+            }}
+            aria-label={
+              lang === 'sv'
+                ? `Ta safari-foto på ${nearbyAnimal.nameSv}`
+                : `Take safari photo of ${nearbyAnimal.nameEn}`
+            }
+            className="flex items-center gap-2.5 px-4 py-2.5 sm:px-5 sm:py-3 rounded-3xl bg-[#FFFDF7] active:bg-amber-100 border-4 border-amber-400 shadow-2xl ring-4 ring-amber-400/30 active:scale-90 transition-all touch-none select-none"
+          >
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-amber-400 flex items-center justify-center shadow-inner">
+              <Camera className="w-5 h-5 sm:w-6 sm:h-6 text-amber-950 stroke-[2.5]" />
+            </div>
+            <div className="text-left pr-1">
+              <div className="text-[10px] font-black uppercase tracking-wider text-amber-700 leading-none">
+                {lang === 'sv' ? '📸 SAFARI-KAMERA' : '📸 SAFARI CAMERA'}
+              </div>
+              <div className="text-sm sm:text-base font-extrabold text-amber-950 font-display leading-tight flex items-center gap-1.5 mt-0.5">
+                <span>{lang === 'sv' ? `Fota ${animalShortName}!` : `Snap ${animalShortName}!`}</span>
+                <span className="text-lg sm:text-xl leading-none">{nearbyAnimal.emoji}</span>
+              </div>
+            </div>
+          </button>
+        </div>
+      )}
       {/* LEFT SIDE: Steering / Drive Controls */}
       <div className="pointer-events-auto flex items-center gap-3 sm:gap-5">
         {/* Reverse / Backa Button */}

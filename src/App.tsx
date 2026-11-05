@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { VehicleConfig, LevelConfig, VehicleType, CarUpgrades, TimeOfDay } from './types';
+import {
+  VehicleConfig,
+  LevelConfig,
+  VehicleType,
+  CarUpgrades,
+  TimeOfDay,
+  SafariPhoto,
+  NearbyAnimalPrompt,
+} from './types';
 import { VEHICLES, LEVELS } from './data/gameData';
 import { GameCanvas } from './components/GameCanvas';
 import { TouchControls } from './components/TouchControls';
@@ -44,6 +52,42 @@ export const App: React.FC = () => {
       } catch {}
       return next;
     });
+  }, []);
+
+  // Collectible Safari Polaroid Photos
+  const [safariPhotos, setSafariPhotos] = useState<Record<string, SafariPhoto>>(() => {
+    try {
+      const saved = localStorage.getItem('knatte_safari_photos');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {};
+  });
+
+  const [nearbyAnimal, setNearbyAnimal] = useState<NearbyAnimalPrompt | null>(null);
+  const [photoTrigger, setPhotoTrigger] = useState<number>(0);
+  const [recentPhotoToast, setRecentPhotoToast] = useState<SafariPhoto | null>(null);
+  const photoToastTimerRef = useRef<any>(null);
+  const [diplomaInitialTab, setDiplomaInitialTab] = useState<'diploma' | 'album'>('diploma');
+
+  const handlePhotoCaptured = useCallback((photo: SafariPhoto) => {
+    setSafariPhotos((prev) => {
+      const next = { ...prev, [photo.animalId]: photo };
+      try {
+        localStorage.setItem('knatte_safari_photos', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    setRecentPhotoToast(photo);
+    if (photoToastTimerRef.current) clearTimeout(photoToastTimerRef.current);
+    photoToastTimerRef.current = setTimeout(() => {
+      setRecentPhotoToast(null);
+    }, 3800);
+  }, []);
+
+  const triggerSnapPhoto = useCallback(() => {
+    sounds.init();
+    setPhotoTrigger((prev) => prev + 1);
   }, []);
 
   // Car Upgrades State (saved in localStorage)
@@ -349,6 +393,8 @@ export const App: React.FC = () => {
         setIsJumping(true);
       } else if (e.key === 'h' || e.key === 'H' || e.key === 'Enter') {
         triggerHonk();
+      } else if (e.key === 'c' || e.key === 'C' || e.key === 'p' || e.key === 'P') {
+        triggerSnapPhoto();
       }
     };
 
@@ -369,7 +415,7 @@ export const App: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [triggerHonk]);
+  }, [triggerHonk, triggerSnapPhoto]);
 
   return (
     <div
@@ -390,7 +436,10 @@ export const App: React.FC = () => {
         onUpgrade={handleUpgrade}
         onSelectVehicle={(v) => setCurrentVehicle(v)}
         onSelectLevel={handleSelectLevel}
-        onOpenDiploma={() => setDiplomaModalOpen(true)}
+        onOpenDiploma={() => {
+          setDiplomaInitialTab('diploma');
+          setDiplomaModalOpen(true);
+        }}
         lang={lang}
         onToggleLang={() => setLang((prev) => (prev === 'sv' ? 'en' : 'sv'))}
         timeOfDay={timeOfDay}
@@ -410,6 +459,37 @@ export const App: React.FC = () => {
         onTapUnlock={handleTapUnlock}
         onActivateToddlerLock={handleActivateToddlerLock}
       />
+
+      {/* Animated Floating Polaroid Pop-Out Card on Photo Capture */}
+      {recentPhotoToast && (
+        <button
+          type="button"
+          onClick={() => {
+            setRecentPhotoToast(null);
+            setDiplomaInitialTab('album');
+            setDiplomaModalOpen(true);
+          }}
+          className="fixed top-16 sm:top-20 right-4 sm:right-6 z-40 w-44 sm:w-52 bg-white p-2 pb-3 rounded-2xl border-2 border-amber-300 shadow-2xl -rotate-3 hover:rotate-0 hover:scale-105 active:scale-95 transition-all text-center animate-bounce cursor-pointer"
+        >
+          <div className="aspect-[3/2] w-full rounded-xl overflow-hidden bg-amber-50 border border-slate-200 relative">
+            <img
+              src={recentPhotoToast.dataUrl}
+              alt={lang === 'sv' ? recentPhotoToast.animalNameSv : recentPhotoToast.animalNameEn}
+              className="w-full h-full object-cover"
+            />
+            <span className="absolute top-1 right-1 bg-amber-400 text-amber-950 text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-2xs">
+              📸 NYTT FOTO!
+            </span>
+          </div>
+          <div className="mt-1.5 text-xs font-extrabold text-amber-950 font-display flex items-center justify-center gap-1">
+            <span>{lang === 'sv' ? recentPhotoToast.animalNameSv : recentPhotoToast.animalNameEn}</span>
+            <span>{recentPhotoToast.animalEmoji}</span>
+          </div>
+          <div className="text-[9px] font-bold text-amber-700 uppercase tracking-wider">
+            {lang === 'sv' ? 'Tryck för att öppna albumet ➔' : 'Tap to open scrapbook ➔'}
+          </div>
+        </button>
+      )}
 
       {/* Main 60fps Canvas Simulator */}
       <GameCanvas
@@ -438,7 +518,11 @@ export const App: React.FC = () => {
         drivingBackward={drivingBackward}
         isJumping={isJumping}
         hornTrigger={hornTrigger}
+        photoTrigger={photoTrigger}
         onAnimalGreeted={handleAnimalGreeted}
+        onNearbyAnimalChange={setNearbyAnimal}
+        onPhotoCaptured={handlePhotoCaptured}
+        photographedAnimalIds={Object.keys(safariPhotos)}
         activeHorn={activeHorn}
         lang={lang}
       />
@@ -455,6 +539,8 @@ export const App: React.FC = () => {
         onJumpStart={() => setIsJumping(true)}
         onJumpEnd={() => setIsJumping(false)}
         onHonk={triggerHonk}
+        nearbyAnimal={nearbyAnimal}
+        onSnapPhoto={triggerSnapPhoto}
         lang={lang}
       />
 
@@ -509,12 +595,13 @@ export const App: React.FC = () => {
         onReplay={handleReplay}
         onOpenDiploma={() => {
           setVictoryModalOpen(false);
+          setDiplomaInitialTab('diploma');
           setDiplomaModalOpen(true);
         }}
         lang={lang}
       />
 
-      {/* Official Driver License / Diploma */}
+      {/* Official Driver License & Safari Photo Scrapbook */}
       <DiplomaModal
         isOpen={diplomaModalOpen}
         onClose={() => setDiplomaModalOpen(false)}
@@ -522,6 +609,8 @@ export const App: React.FC = () => {
         vehicle={currentVehicle}
         lang={lang}
         greetedAnimals={greetedAnimals}
+        safariPhotos={safariPhotos}
+        initialTab={diplomaInitialTab}
       />
     </div>
   );

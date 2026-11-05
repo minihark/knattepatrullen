@@ -102,4 +102,8 @@ gen_en "en_dog_buster" "Woof woof! Hello there! I am Buster the Dog and I love d
 gen_en "en_moose_helge" "Mooo! Hello from Helge the Moose! Drive safe and gentle through the forest!"
 gen_en "en_fox_rune" "Yahoo! I am Rune the Fox! What a wonderful car you are driving!"
 
+# Safari Photo Camera
+gen_sv "sv_photo_snap" "Klick! Vilket jättefint safari-foto till ditt album!"
+gen_en "en_photo_snap" "Click! What a wonderful safari photo for your album!"
+
 echo "All voice files generated successfully!"

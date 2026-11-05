@@ -1048,6 +1048,66 @@ class SoundEngine {
     }
   }
 
+  // ------------------------------------------------------------------
+  // 2.9 SAFARI POLAROID CAMERA SHUTTER & FLASH
+  // ------------------------------------------------------------------
+  public playCameraShutter() {
+    if (this.isMuted) return;
+    triggerHaptic([15, 30, 15]);
+    const ctx = this.getContext();
+    if (!ctx) return;
+    this.init();
+
+    const t = ctx.currentTime;
+
+    // 1. Mechanical mirror flip click
+    const click1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    click1.type = 'triangle';
+    click1.frequency.setValueAtTime(1400, t);
+    click1.frequency.exponentialRampToValueAtTime(280, t + 0.032);
+    gain1.gain.setValueAtTime(0.32, t);
+    gain1.gain.exponentialRampToValueAtTime(0.001, t + 0.035);
+    click1.connect(gain1);
+    gain1.connect(ctx.destination);
+    click1.start(t);
+    click1.stop(t + 0.04);
+
+    // 2. Second curtain latch click
+    const click2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    click2.type = 'square';
+    click2.frequency.setValueAtTime(1850, t + 0.048);
+    click2.frequency.exponentialRampToValueAtTime(420, t + 0.082);
+    gain2.gain.setValueAtTime(0.24, t + 0.048);
+    gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.085);
+    click2.connect(gain2);
+    gain2.connect(ctx.destination);
+    click2.start(t + 0.048);
+    click2.stop(t + 0.09);
+
+    // 3. Polaroid film ejection whir + joyful flash sparkle chime
+    const chime = ctx.createOscillator();
+    const chimeGain = ctx.createGain();
+    chime.type = 'sine';
+    chime.frequency.setValueAtTime(660, t + 0.08);
+    chime.frequency.exponentialRampToValueAtTime(1320, t + 0.26);
+    chimeGain.gain.setValueAtTime(0.2, t + 0.08);
+    chimeGain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+    chime.connect(chimeGain);
+    chimeGain.connect(ctx.destination);
+    chime.start(t + 0.08);
+    chime.stop(t + 0.29);
+  }
+
+  public playPhotoSnapVoice(lang: 'sv' | 'en' = 'sv') {
+    const fallback =
+      lang === 'sv'
+        ? 'Klick! Vilket jättefint safari-foto till ditt album!'
+        : 'Click! What a wonderful safari photo for your album!';
+    this.playVoiceClip('photo_snap', fallback, lang);
+  }
+
   public playSnap() {
     if (this.isMuted) return;
     const ctx = this.getContext();

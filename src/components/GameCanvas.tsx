@@ -1,7 +1,26 @@
 import React, { useRef, useEffect } from 'react';
-import { VehicleType, LevelConfig, CollectibleItem, Particle, CarUpgrades, TimeOfDay } from '../types';
+import {
+  VehicleType,
+  LevelConfig,
+  CollectibleItem,
+  Particle,
+  CarUpgrades,
+  TimeOfDay,
+  SafariPhoto,
+  NearbyAnimalPrompt,
+} from '../types';
 import { VEHICLES } from '../data/gameData';
 import { sounds } from '../audio/soundEngine';
+
+const ANIMAL_META: Record<string, { nameSv: string; nameEn: string; emoji: string }> = {
+  cat: { nameSv: 'Katten Misse', nameEn: 'Misse the Cat', emoji: '🐱' },
+  owl: { nameSv: 'Ugglan Ulla', nameEn: 'Ulla the Owl', emoji: '🦉' },
+  fox: { nameSv: 'Räven Rune', nameEn: 'Rune the Fox', emoji: '🦊' },
+  moose: { nameSv: 'Älgen Helge', nameEn: 'Helge the Moose', emoji: '🫎' },
+  dog: { nameSv: 'Hunden Buster', nameEn: 'Buster the Dog', emoji: '🐶' },
+  rabbit: { nameSv: 'Pelle Kanin', nameEn: 'Pelle the Rabbit', emoji: '🐰' },
+  squirrel: { nameSv: 'Nils Ekorre', nameEn: 'Nils the Squirrel', emoji: '🐿️' },
+};
 
 interface GameCanvasProps {
   currentVehicle: VehicleType;
@@ -22,10 +41,14 @@ interface GameCanvasProps {
   drivingBackward: boolean;
   isJumping: boolean;
   hornTrigger: number;
+  photoTrigger?: number;
   activeHorn?: 'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog';
   timeOfDay?: TimeOfDay;
   lang: 'sv' | 'en';
   onAnimalGreeted?: (animalType: string, name: string) => void;
+  onNearbyAnimalChange?: (animal: NearbyAnimalPrompt | null) => void;
+  onPhotoCaptured?: (photo: SafariPhoto) => void;
+  photographedAnimalIds?: string[];
 }
 
 interface MushroomProp {
@@ -83,12 +106,31 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   drivingBackward,
   isJumping,
   hornTrigger,
+  photoTrigger = 0,
   activeHorn,
   timeOfDay = 'day',
   lang,
   onAnimalGreeted,
+  onNearbyAnimalChange,
+  onPhotoCaptured,
+  photographedAnimalIds = [],
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const onPhotoCapturedRef = useRef(onPhotoCaptured);
+  useEffect(() => {
+    onPhotoCapturedRef.current = onPhotoCaptured;
+  }, [onPhotoCaptured]);
+
+  const onNearbyAnimalChangeRef = useRef(onNearbyAnimalChange);
+  useEffect(() => {
+    onNearbyAnimalChangeRef.current = onNearbyAnimalChange;
+  }, [onNearbyAnimalChange]);
+
+  const photographedIdsRef = useRef<string[]>(photographedAnimalIds);
+  useEffect(() => {
+    photographedIdsRef.current = photographedAnimalIds;
+  }, [photographedAnimalIds]);
 
   // Mutable Game Simulation State
   const stateRef = useRef({
@@ -169,6 +211,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     isJumping: false,
     jumpCooldown: 0,
     hornCooldown: 0,
+
+    // Safari Polaroid Camera State
+    pendingSnapshot: null as { animal: AnimalProp; timer: number } | null,
+    flashAlpha: 0,
+    lastNearbyKey: null as string | null,
   });
 
   // Keep control props synced
@@ -263,6 +310,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
               color: '#F59E0B',
               size: 20,
             });
+
+            // Auto-snap first Polaroid photo when honking at an unphotographed animal!
+            if (
+              !photographedIdsRef.current.includes(animal.type) &&
+              !state.pendingSnapshot
+            ) {
+              sounds.playCameraShutter();
+              state.flashAlpha = 0.75;
+              state.pendingSnapshot = { animal, timer: 0.14 };
+            }
           }
 
           if (animal.type === 'moose') {
@@ -297,6 +354,63 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       });
     }
   }, [hornTrigger, currentVehicle, activeHorn, lang]);
+
+  // Handle Explicit Polaroid Camera Shutter Trigger
+  useEffect(() => {
+    if (photoTrigger > 0) {
+      const state = stateRef.current;
+      // Find closest animal friend near the car
+      let closestAnimal: AnimalProp | null = null;
+      let minDist = Infinity;
+      for (const animal of state.animals) {
+        const d = Math.abs(state.carX - animal.x);
+        if (d < minDist) {
+          minDist = d;
+          closestAnimal = animal;
+        }
+      }
+
+      if (closestAnimal && minDist < 480) {
+        sounds.playCameraShutter();
+        sounds.playPhotoSnapVoice(lang);
+        state.flashAlpha = 0.9;
+        closestAnimal.jumpVy = closestAnimal.type === 'moose' ? -5.5 : -8.5;
+        if (!closestAnimal.greeted && closestAnimal.type) {
+          closestAnimal.greeted = true;
+          onAnimalGreeted?.(closestAnimal.type, closestAnimal.name);
+        }
+
+        const meta = closestAnimal.type ? ANIMAL_META[closestAnimal.type] : null;
+        const displayName = meta
+          ? lang === 'sv'
+            ? meta.nameSv
+            : meta.nameEn
+          : closestAnimal.name;
+
+        closestAnimal.speechBubble = {
+          text: `📸 ${displayName}! ✨`,
+          timer: 3.0,
+        };
+
+        for (let p = 0; p < 6; p++) {
+          state.particles.push({
+            x: closestAnimal.x + (Math.random() - 0.5) * 28,
+            y: getGroundY(closestAnimal.x, state.canvasHeight) - 75,
+            vx: (Math.random() - 0.5) * 4,
+            vy: -3.5 - Math.random() * 2.5,
+            size: 18,
+            color: ['#F59E0B', '#EC4899', '#10B981', '#38BDF8'][p % 4],
+            alpha: 1,
+            life: 0,
+            maxLife: 38,
+            shape: p % 2 === 0 ? 'heart' : 'star',
+          });
+        }
+
+        state.pendingSnapshot = { animal: closestAnimal, timer: 0.12 };
+      }
+    }
+  }, [photoTrigger, lang]);
 
   // Check if current checkpoint is solved
   const isCurrentCheckpointSolved = (): boolean => {
@@ -818,6 +932,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
               color: '#F59E0B',
               size: 20,
             });
+
+            // Auto-snap first Polaroid photo when meeting an unphotographed animal!
+            if (
+              !photographedIdsRef.current.includes(animal.type) &&
+              !state.pendingSnapshot
+            ) {
+              sounds.playCameraShutter();
+              state.flashAlpha = 0.72;
+              state.pendingSnapshot = { animal, timer: 0.14 };
+            }
           }
 
           const particleColor =
@@ -867,6 +991,36 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           }
         }
       });
+
+      // Detect closest animal within 260px for the contextual Polaroid Shutter Trigger
+      let nearestAnimal: AnimalProp | null = null;
+      let nearestDist = 260;
+      for (const animal of state.animals) {
+        const d = Math.abs(state.carX - animal.x);
+        if (d < nearestDist && animal.type) {
+          nearestDist = d;
+          nearestAnimal = animal;
+        }
+      }
+      const nextNearbyKey = nearestAnimal?.type || null;
+      if (state.lastNearbyKey !== nextNearbyKey) {
+        state.lastNearbyKey = nextNearbyKey;
+        if (nearestAnimal && nearestAnimal.type) {
+          const meta = ANIMAL_META[nearestAnimal.type] || {
+            nameSv: nearestAnimal.name,
+            nameEn: nearestAnimal.name,
+            emoji: nearestAnimal.emoji,
+          };
+          onNearbyAnimalChangeRef.current?.({
+            id: nearestAnimal.type,
+            nameSv: meta.nameSv,
+            nameEn: meta.nameEn,
+            emoji: meta.emoji,
+          });
+        } else {
+          onNearbyAnimalChangeRef.current?.(null);
+        }
+      }
 
       state.windmillAngle += dt * 1.2;
 
@@ -2173,6 +2327,92 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       }
 
       // ----------------------------------------------------
+      // SAFARI POLAROID SNAPSHOT CAPTURE (Before Floating Texts)
+      // ----------------------------------------------------
+      if (state.pendingSnapshot) {
+        state.pendingSnapshot.timer -= dt;
+        if (state.pendingSnapshot.timer <= 0) {
+          const snapAnimal = state.pendingSnapshot.animal;
+          state.pendingSnapshot = null;
+
+          try {
+            const offCanvas = document.createElement('canvas');
+            offCanvas.width = 360;
+            offCanvas.height = 240;
+            const offCtx = offCanvas.getContext('2d');
+            if (offCtx && canvas) {
+              const dpr = canvas.width / Math.max(1, viewW);
+              const carScreenX = state.carX - state.camX;
+              const animalScreenX = snapAnimal.x - state.camX;
+              const midScreenX = (carScreenX + animalScreenX) / 2;
+              const midGroundY = getGroundY((state.carX + snapAnimal.x) / 2, viewH) - state.camY;
+              const midScreenY = midGroundY - 58;
+
+              const cropW = Math.min(viewW, 420);
+              const cropH = Math.min(viewH, cropW * (240 / 360));
+              const cropX = Math.max(0, Math.min(viewW - cropW, midScreenX - cropW / 2));
+              const cropY = Math.max(0, Math.min(viewH - cropH, midScreenY - cropH / 2));
+
+              offCtx.drawImage(
+                canvas,
+                cropX * dpr,
+                cropY * dpr,
+                cropW * dpr,
+                cropH * dpr,
+                0,
+                0,
+                360,
+                240
+              );
+
+              // Subtle warm sunlit Polaroid inner border
+              offCtx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+              offCtx.lineWidth = 4;
+              offCtx.strokeRect(2, 2, 356, 236);
+
+              const dataUrl = offCanvas.toDataURL('image/jpeg', 0.84);
+              const animalId = snapAnimal.type || 'moose';
+              const meta = ANIMAL_META[animalId] || {
+                nameSv: snapAnimal.name,
+                nameEn: snapAnimal.name,
+                emoji: snapAnimal.emoji,
+              };
+
+              const newPhoto: SafariPhoto = {
+                animalId,
+                animalNameSv: meta.nameSv,
+                animalNameEn: meta.nameEn,
+                animalEmoji: meta.emoji,
+                dataUrl,
+                vehicleId: vehicleConfig.id,
+                vehicleNameSv: vehicleConfig.nameSv,
+                vehicleNameEn: vehicleConfig.nameEn,
+                vehicleEmoji: vehicleConfig.emoji,
+                levelId: currentLevel.id,
+                levelTitleSv: currentLevel.titleSv,
+                levelTitleEn: currentLevel.titleEn,
+                timeOfDay,
+                takenAt: new Date().toISOString(),
+              };
+
+              onPhotoCapturedRef.current?.(newPhoto);
+
+              state.floatingTexts.push({
+                id: state.nextTextId++,
+                text: lang === 'sv' ? `📸 Foto sparat! ${meta.emoji}` : `📸 Photo Saved! ${meta.emoji}`,
+                x: snapAnimal.x,
+                y: getGroundY(snapAnimal.x, viewH) - 125,
+                vy: -2.2,
+                alpha: 1,
+                color: '#38BDF8',
+                size: 22,
+              });
+            }
+          } catch {}
+        }
+      }
+
+      // ----------------------------------------------------
       // FLOATING JUICE TEXTS (+1 🍎, SUPER-HOPP!, TURBO!, SLÄCKT!)
       // ----------------------------------------------------
       state.floatingTexts.forEach((ft) => {
@@ -2190,6 +2430,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       });
 
       ctx.restore();
+
+      // Warm Camera Shutter Flash Overlay
+      if (state.flashAlpha > 0) {
+        ctx.save();
+        ctx.fillStyle = `rgba(255, 253, 245, ${Math.min(1, state.flashAlpha)})`;
+        ctx.fillRect(0, 0, viewW, viewH);
+        ctx.restore();
+        state.flashAlpha = Math.max(0, state.flashAlpha - dt * 2.8);
+      }
 
       animationFrameId = requestAnimationFrame(loop);
     };

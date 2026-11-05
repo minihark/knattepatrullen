@@ -124,3 +124,27 @@ export interface SafariBadgeConfig {
   borderClass: string;
   tilt: string;
 }
+
+export interface SafariPhoto {
+  animalId: string;
+  animalNameSv: string;
+  animalNameEn: string;
+  animalEmoji: string;
+  dataUrl: string;
+  vehicleId: VehicleType;
+  vehicleNameSv: string;
+  vehicleNameEn: string;
+  vehicleEmoji: string;
+  levelId: LevelId;
+  levelTitleSv: string;
+  levelTitleEn: string;
+  timeOfDay: TimeOfDay;
+  takenAt: string;
+}
+
+export interface NearbyAnimalPrompt {
+  id: string;
+  nameSv: string;
+  nameEn: string;
+  emoji: string;
+}
