@@ -109,3 +109,18 @@ export interface ColorPuzzleState {
   solved: boolean;
   targetX: number;
 }
+
+export interface SafariBadgeConfig {
+  id: 'moose' | 'fox' | 'owl' | 'cat' | 'dog';
+  nameSv: string;
+  nameEn: string;
+  titleSv: string;
+  titleEn: string;
+  taglineSv: string;
+  taglineEn: string;
+  emoji: string;
+  colorClass: string;
+  bgClass: string;
+  borderClass: string;
+  tilt: string;
+}

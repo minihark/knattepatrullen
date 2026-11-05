@@ -26,6 +26,26 @@ export const App: React.FC = () => {
     }
   });
 
+  // Safari wildlife friends greeted during the adventure
+  const [greetedAnimals, setGreetedAnimals] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('knatte_greeted_animals');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [];
+  });
+
+  const handleAnimalGreeted = useCallback((animalType: string) => {
+    setGreetedAnimals((prev) => {
+      if (prev.includes(animalType)) return prev;
+      const next = [...prev, animalType];
+      try {
+        localStorage.setItem('knatte_greeted_animals', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
   // Car Upgrades State (saved in localStorage)
   const [upgrades, setUpgrades] = useState<CarUpgrades>(() => {
     try {
@@ -418,6 +438,7 @@ export const App: React.FC = () => {
         drivingBackward={drivingBackward}
         isJumping={isJumping}
         hornTrigger={hornTrigger}
+        onAnimalGreeted={handleAnimalGreeted}
         activeHorn={activeHorn}
         lang={lang}
       />
@@ -500,6 +521,7 @@ export const App: React.FC = () => {
         starsEarned={starsEarned}
         vehicle={currentVehicle}
         lang={lang}
+        greetedAnimals={greetedAnimals}
       />
     </div>
   );

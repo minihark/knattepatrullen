@@ -25,6 +25,7 @@ interface GameCanvasProps {
   activeHorn?: 'horn' | 'quack' | 'siren' | 'boing' | 'cat' | 'dog';
   timeOfDay?: TimeOfDay;
   lang: 'sv' | 'en';
+  onAnimalGreeted?: (animalType: string, name: string) => void;
 }
 
 interface MushroomProp {
@@ -85,6 +86,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   activeHorn,
   timeOfDay = 'day',
   lang,
+  onAnimalGreeted,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -246,7 +248,22 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       state.animals.forEach((animal) => {
         if (Math.abs(state.carX - animal.x) < 480) {
           animal.jumpVy = animal.type === 'moose' ? -5.5 : -8.5;
+          const wasGreeted = animal.greeted;
           animal.greeted = true;
+
+          if (!wasGreeted && animal.type) {
+            onAnimalGreeted?.(animal.type, animal.name);
+            state.floatingTexts.push({
+              id: state.nextTextId++,
+              text: lang === 'sv' ? `Safari-stämpel! ${animal.emoji}` : `Safari Stamp! ${animal.emoji}`,
+              x: animal.x,
+              y: getGroundY(animal.x, state.canvasHeight) - 95,
+              vy: -2.0,
+              alpha: 1,
+              color: '#F59E0B',
+              size: 20,
+            });
+          }
 
           if (animal.type === 'moose') {
             sounds.playMooseSound();
@@ -788,6 +805,20 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         if (dist < 125 && !animal.greeted) {
           animal.greeted = true;
           animal.jumpVy = animal.type === 'moose' ? -5.5 : -8.5;
+
+          if (animal.type) {
+            onAnimalGreeted?.(animal.type, animal.name);
+            state.floatingTexts.push({
+              id: state.nextTextId++,
+              text: lang === 'sv' ? `Safari-stämpel! ${animal.emoji}` : `Safari Stamp! ${animal.emoji}`,
+              x: animal.x,
+              y: getGroundY(animal.x, state.canvasHeight) - 95,
+              vy: -2.0,
+              alpha: 1,
+              color: '#F59E0B',
+              size: 20,
+            });
+          }
 
           const particleColor =
             animal.type === 'cat'

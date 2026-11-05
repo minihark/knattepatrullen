@@ -45,3 +45,17 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Crisp A4 / Letter Certificate Printing */
+@media print {
+  @page {
+    size: auto;
+    margin: 8mm;
+  }
+  html, body {
+    overflow: visible !important;
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
